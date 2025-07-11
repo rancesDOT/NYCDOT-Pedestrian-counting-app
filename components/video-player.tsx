@@ -61,6 +61,14 @@ const VideoPlayer = React.forwardRef<HTMLVideoElement, VideoPlayerProps>(
       (file: File | null) => {
         if (file && file.type.startsWith("video/")) {
           const url = URL.createObjectURL(file)
+
+          // Clear any existing saved data before setting new video
+          try {
+            localStorage.removeItem("pedestrian-counter-data")
+          } catch (error) {
+            console.error("Error clearing saved data:", error)
+          }
+
           onVideoSelect(url)
           setTimeout(() => {
             const labelButton = document.querySelector("[data-label-intersections]") as HTMLButtonElement

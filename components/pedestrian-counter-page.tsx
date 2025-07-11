@@ -172,7 +172,7 @@ export default function PedestrianCounterPage() {
   }, [loadFromStorage])
 
   useEffect(() => {
-    if (!isDataLoaded) return
+    if (!isDataLoaded || !videoSrc) return
 
     saveToStorage()
 
@@ -437,18 +437,30 @@ export default function PedestrianCounterPage() {
     }
   }, [])
 
-  const handleVideoSelect = useCallback((src: string | null) => {
-    setVideoSrc(src)
-    setIntersections([])
-    if (src) {
-      setIsPlaying(false)
-      setPlaybackRate(1)
-      setCurrentTime(0)
-      setDuration(0)
-      // Show time input dialog when new video is selected
-      setShowTimeInputDialog(true)
-    }
-  }, [])
+  const handleVideoSelect = useCallback(
+    (src: string | null) => {
+      setVideoSrc(src)
+      setIntersections([])
+      if (src) {
+        // Reset all data for new video
+        setCounts(initialCounts)
+        setLog([])
+        setIsPlaying(false)
+        setPlaybackRate(1)
+        setCurrentTime(0)
+        setDuration(0)
+        setLastPressed(null)
+        setRecordingStartTime(null)
+
+        // Clear stored data immediately
+        clearStorage()
+
+        // Show time input dialog when new video is selected
+        setShowTimeInputDialog(true)
+      }
+    },
+    [clearStorage],
+  )
 
   const handleTimeInputConfirm = useCallback((startTime: Date) => {
     setRecordingStartTime(startTime)
@@ -631,7 +643,14 @@ export default function PedestrianCounterPage() {
         totalEntries={log.length}
         groupedEntries={groupedData.length}
       />
-      <HelpSidebar isOpen={showHelpSidebar} onClose={() => setShowHelpSidebar(false)} />
+      <HelpSidebar
+        isOpen={showHelpSidebar}
+        onClose={() => setShowHelpSidebar(false)}
+        onCount={handleCount}
+        onUndo={handleUndo}
+        intersectionsSet={intersections.length === 4}
+        canUndo={log.length > 0}
+      />
 
       {showVideoRestorePrompt && savedStateForRestore && (
         <VideoRestorePrompt

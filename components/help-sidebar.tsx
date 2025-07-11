@@ -2,26 +2,95 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { X, Keyboard, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, ChevronLeft } from "lucide-react"
+import { X, Keyboard, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, ChevronLeft, Undo2 } from "lucide-react"
 
 interface HelpSidebarProps {
   isOpen: boolean
   onClose: () => void
+  onCount?: (key: string) => void
+  onUndo?: () => void
+  intersectionsSet?: boolean
+  canUndo?: boolean
 }
 
 const keyboardShortcuts = [
-  { keys: ["1"], description: "Count Eastbound (North)", color: "bg-blue-500", textColor: "text-blue-600" },
-  { keys: ["2"], description: "Count Westbound (North)", color: "bg-blue-500", textColor: "text-blue-600" },
-  { keys: ["3"], description: "Count Eastbound (South)", color: "bg-red-500", textColor: "text-red-600" },
-  { keys: ["4"], description: "Count Westbound (South)", color: "bg-red-500", textColor: "text-red-600" },
-  { keys: ["5"], description: "Count Northbound (East)", color: "bg-emerald-500", textColor: "text-emerald-600" },
-  { keys: ["6"], description: "Count Southbound (East)", color: "bg-emerald-500", textColor: "text-emerald-600" },
-  { keys: ["7"], description: "Count Northbound (West)", color: "bg-amber-500", textColor: "text-amber-600" },
-  { keys: ["8"], description: "Count Southbound (West)", color: "bg-amber-500", textColor: "text-amber-600" },
-  { keys: ["Space"], description: "Play/Pause video", color: "bg-gray-500", textColor: "text-gray-600" },
-  { keys: ["←", "→"], description: "Slow down / Speed up", color: "bg-gray-500", textColor: "text-gray-600" },
-  { keys: ["Z"], description: "Undo last count", color: "bg-orange-500", textColor: "text-orange-600" },
-  { keys: ["?"], description: "Toggle this help", color: "bg-purple-500", textColor: "text-purple-600" },
+  {
+    keys: ["1"],
+    description: "Count Eastbound (North)",
+    color: "bg-blue-500",
+    textColor: "text-blue-600",
+    direction: "Eastbound",
+  },
+  {
+    keys: ["2"],
+    description: "Count Westbound (North)",
+    color: "bg-blue-500",
+    textColor: "text-blue-600",
+    direction: "Westbound",
+  },
+  {
+    keys: ["3"],
+    description: "Count Eastbound (South)",
+    color: "bg-red-500",
+    textColor: "text-red-600",
+    direction: "Eastbound",
+  },
+  {
+    keys: ["4"],
+    description: "Count Westbound (South)",
+    color: "bg-red-500",
+    textColor: "text-red-600",
+    direction: "Westbound",
+  },
+  {
+    keys: ["5"],
+    description: "Count Northbound (East)",
+    color: "bg-emerald-500",
+    textColor: "text-emerald-600",
+    direction: "Northbound",
+  },
+  {
+    keys: ["6"],
+    description: "Count Southbound (East)",
+    color: "bg-emerald-500",
+    textColor: "text-emerald-600",
+    direction: "Southbound",
+  },
+  {
+    keys: ["7"],
+    description: "Count Northbound (West)",
+    color: "bg-amber-500",
+    textColor: "text-amber-600",
+    direction: "Northbound",
+  },
+  {
+    keys: ["8"],
+    description: "Count Southbound (West)",
+    color: "bg-amber-500",
+    textColor: "text-amber-600",
+    direction: "Southbound",
+  },
+  {
+    keys: ["Space"],
+    description: "Play/Pause video",
+    color: "bg-gray-500",
+    textColor: "text-gray-600",
+    direction: null,
+  },
+  {
+    keys: ["←", "→"],
+    description: "Slow down / Speed up",
+    color: "bg-gray-500",
+    textColor: "text-gray-600",
+    direction: null,
+  },
+  {
+    keys: ["?"],
+    description: "Toggle this help",
+    color: "bg-purple-500",
+    textColor: "text-purple-600",
+    direction: null,
+  },
 ]
 
 const directionIcons = {
@@ -31,7 +100,14 @@ const directionIcons = {
   Southbound: <ArrowDown className="h-4 w-4" />,
 }
 
-export default function HelpSidebar({ isOpen, onClose }: HelpSidebarProps) {
+export default function HelpSidebar({
+  isOpen,
+  onClose,
+  onCount,
+  onUndo,
+  intersectionsSet = false,
+  canUndo = false,
+}: HelpSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
 
   useEffect(() => {
@@ -50,6 +126,23 @@ export default function HelpSidebar({ isOpen, onClose }: HelpSidebarProps) {
     }
   }, [isOpen, onClose])
 
+  const handleShortcutClick = (keys: string[]) => {
+    if (onCount && intersectionsSet && keys.length > 0) {
+      // Use the first key if multiple keys are available
+      const key = keys[0]
+      // Only allow counting keys (1-8), not control keys
+      if (["1", "2", "3", "4", "5", "6", "7", "8"].includes(key)) {
+        onCount(key)
+      }
+    }
+  }
+
+  const handleUndoClick = () => {
+    if (onUndo && canUndo) {
+      onUndo()
+    }
+  }
+
   if (!isOpen) return null
 
   return (
@@ -66,7 +159,7 @@ export default function HelpSidebar({ isOpen, onClose }: HelpSidebarProps) {
             {!isCollapsed && (
               <div className="flex items-center gap-3">
                 <Keyboard className="h-5 w-5 text-blue-600" />
-                <h2 className="text-lg font-bold text-gray-800 dark:text-white">Keyboard Controls</h2>
+                <h2 className="text-lg font-bold text-gray-800 dark:text-white">Controls</h2>
               </div>
             )}
             <div className="flex items-center gap-2">
@@ -90,37 +183,79 @@ export default function HelpSidebar({ isOpen, onClose }: HelpSidebarProps) {
 
           {!isCollapsed && (
             <>
+              {/* Undo Button */}
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+                <Button
+                  onClick={handleUndoClick}
+                  disabled={!canUndo}
+                  className={`w-full flex items-center justify-center gap-3 h-12 transition-all duration-200 ${
+                    canUndo
+                      ? "bg-orange-500 hover:bg-orange-600 text-white hover:scale-105 hover:shadow-md"
+                      : "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                  }`}
+                  title={canUndo ? "Click to undo last count (Z)" : "No counts to undo"}
+                >
+                  <Undo2 className="h-5 w-5" />
+                  <span className="font-semibold">Undo Last Count</span>
+                  <kbd className="px-2 py-1 text-xs font-mono bg-black/20 text-white rounded">Z</kbd>
+                </Button>
+              </div>
+
               {/* Content */}
               <div className="flex-1 overflow-y-auto p-4">
                 <div className="space-y-3">
-                  {keyboardShortcuts.map((shortcut, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-all duration-200 shadow-sm border border-gray-200 dark:border-gray-600"
-                    >
-                      <div className="flex items-center gap-4 flex-1 min-w-0">
-                        <div className="flex gap-2">
-                          {shortcut.keys.map((key, keyIndex) => (
-                            <kbd
-                              key={keyIndex}
-                              className={`px-3 py-2 text-sm font-mono ${shortcut.color} text-white rounded shadow-md min-w-[2rem] text-center font-bold`}
-                            >
-                              {key}
-                            </kbd>
-                          ))}
+                  {keyboardShortcuts.map((shortcut, index) => {
+                    const isCountingKey = ["1", "2", "3", "4", "5", "6", "7", "8"].includes(shortcut.keys[0])
+                    const isClickable = isCountingKey && intersectionsSet && onCount
+
+                    return (
+                      <div
+                        key={index}
+                        className={`flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg transition-all duration-200 shadow-sm border border-gray-200 dark:border-gray-600 ${
+                          isClickable
+                            ? "hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer hover:scale-105 hover:shadow-md"
+                            : "hover:bg-gray-100 dark:hover:bg-gray-600"
+                        }`}
+                        onClick={() => {
+                          if (isCountingKey && isClickable) {
+                            handleShortcutClick(shortcut.keys)
+                          }
+                        }}
+                        title={isCountingKey && isClickable ? `Click to count ${shortcut.description}` : undefined}
+                      >
+                        <div className="flex items-center gap-4 flex-1 min-w-0">
+                          <div className="flex gap-2">
+                            {shortcut.keys.map((key, keyIndex) => (
+                              <kbd
+                                key={keyIndex}
+                                className={`px-3 py-2 text-sm font-mono ${shortcut.color} text-white rounded shadow-md min-w-[2rem] text-center font-bold transition-transform duration-200 ${
+                                  isClickable ? "hover:scale-110" : ""
+                                }`}
+                              >
+                                {key}
+                              </kbd>
+                            ))}
+                            {/* Direction Arrow Box */}
+                            {shortcut.direction && (
+                              <div
+                                className={`px-3 py-2 text-sm font-mono ${shortcut.color} text-white rounded shadow-md min-w-[2rem] text-center font-bold transition-transform duration-200 flex items-center justify-center ${
+                                  isClickable ? "hover:scale-110" : ""
+                                }`}
+                              >
+                                {directionIcons[shortcut.direction as keyof typeof directionIcons]}
+                              </div>
+                            )}
+                          </div>
+                          <span className="text-sm text-gray-700 dark:text-gray-200 font-medium">
+                            {shortcut.description}
+                          </span>
                         </div>
-                        <span className="text-sm text-gray-700 dark:text-gray-200 font-medium">
-                          {shortcut.description}
-                        </span>
+                        <div className="text-gray-500 dark:text-gray-400 flex-shrink-0 ml-3 flex items-center gap-2">
+                          {isClickable && <div className="text-xs text-blue-600 dark:text-blue-400">✨</div>}
+                        </div>
                       </div>
-                      <div className="text-gray-500 dark:text-gray-400 flex-shrink-0 ml-3">
-                        {shortcut.description.includes("Eastbound") && directionIcons["Eastbound"]}
-                        {shortcut.description.includes("Westbound") && directionIcons["Westbound"]}
-                        {shortcut.description.includes("Northbound") && directionIcons["Northbound"]}
-                        {shortcut.description.includes("Southbound") && directionIcons["Southbound"]}
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
 
                 {/* Quick Reference */}
@@ -128,8 +263,14 @@ export default function HelpSidebar({ isOpen, onClose }: HelpSidebarProps) {
                   <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-3 text-sm">Quick Tips</h4>
                   <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-2">
                     <li>• Press number keys 1-8 to count pedestrians</li>
+                    <li>
+                      •{" "}
+                      {intersectionsSet
+                        ? "Click on counting shortcuts above to count with mouse"
+                        : "Set up intersections first to enable mouse counting"}
+                    </li>
                     <li>• Use Space bar to play/pause video</li>
-                    <li>• Press Z to undo the last count</li>
+                    <li>• Press Z to undo the last count {canUndo ? "(or click the undo button above)" : ""}</li>
                     <li>• Press ? to toggle this help sidebar</li>
                     <li>• Use arrow keys ← → to adjust playback speed</li>
                   </ul>
