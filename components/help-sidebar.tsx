@@ -84,6 +84,7 @@ const keyboardShortcuts = [
     textColor: "text-gray-600",
     direction: null,
   },
+  // Removed "Z" from here as it's now a dedicated button
   {
     keys: ["?"],
     description: "Toggle this help",
@@ -128,9 +129,7 @@ export default function HelpSidebar({
 
   const handleShortcutClick = (keys: string[]) => {
     if (onCount && intersectionsSet && keys.length > 0) {
-      // Use the first key if multiple keys are available
       const key = keys[0]
-      // Only allow counting keys (1-8), not control keys
       if (["1", "2", "3", "4", "5", "6", "7", "8"].includes(key)) {
         onCount(key)
       }
@@ -159,7 +158,7 @@ export default function HelpSidebar({
             {!isCollapsed && (
               <div className="flex items-center gap-3">
                 <Keyboard className="h-5 w-5 text-blue-600" />
-                <h2 className="text-lg font-bold text-gray-800 dark:text-white">Controls</h2>
+                <h2 className="text-lg font-bold text-gray-800 dark:text-white">Keyboard Controls</h2>
               </div>
             )}
             <div className="flex items-center gap-2">
@@ -273,6 +272,8 @@ export default function HelpSidebar({
                     <li>• Press Z to undo the last count {canUndo ? "(or click the undo button above)" : ""}</li>
                     <li>• Press ? to toggle this help sidebar</li>
                     <li>• Use arrow keys ← → to adjust playback speed</li>
+                    <li>• When video ends, you can upload another video to continue counting</li>
+                    <li>• All data from multiple videos will be combined in the export</li>
                   </ul>
                 </div>
               </div>

@@ -7,6 +7,7 @@ import ExportProgressModal from "@/components/export-progress-modal"
 import HelpSidebar from "@/components/help-sidebar"
 import VideoRestorePrompt from "@/components/video-restore-prompt"
 import VideoTimeInputDialog from "@/components/video-time-input-dialog"
+import VideoEndPrompt from "@/components/video-end-prompt"
 import { directionsConfig as directions } from "@/lib/key-mappings"
 
 interface Intersection {
@@ -19,6 +20,7 @@ interface Intersection {
 interface LogEntry {
   key: string
   timestamp: number
+  videoIndex: number // Track which video this count came from
 }
 
 interface GroupedEntry {
@@ -29,6 +31,7 @@ interface GroupedEntry {
   totalCount: number
   actualStartTime?: Date
   actualEndTime?: Date
+  videoIndex?: number
 }
 
 interface SavedState {
@@ -42,6 +45,8 @@ interface SavedState {
   lastSaved: number
   videoFileName?: string
   recordingStartTime?: string // ISO string
+  videoCount: number
+  currentVideoIndex: number
 }
 
 const initialCounts = directions.reduce((acc, dir) => ({ ...acc, [dir.name]: 0 }), {})
@@ -66,6 +71,9 @@ export default function PedestrianCounterPage() {
   const [pendingVideoRestore, setPendingVideoRestore] = useState(false)
   const [showTimeInputDialog, setShowTimeInputDialog] = useState(false)
   const [recordingStartTime, setRecordingStartTime] = useState<Date | null>(null)
+  const [showVideoEndPrompt, setShowVideoEndPrompt] = useState(false)
+  const [videoCount, setVideoCount] = useState(1)
+  const [currentVideoIndex, setCurrentVideoIndex] = useState(0)
 
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
@@ -86,13 +94,26 @@ export default function PedestrianCounterPage() {
         duration,
         lastSaved: Date.now(),
         recordingStartTime: recordingStartTime?.toISOString(),
+        videoCount,
+        currentVideoIndex,
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave))
       console.log("Data saved to localStorage")
     } catch (error) {
       console.error("Failed to save data to localStorage:", error)
     }
-  }, [counts, log, videoSrc, intersections, playbackRate, currentTime, duration, recordingStartTime])
+  }, [
+    counts,
+    log,
+    videoSrc,
+    intersections,
+    playbackRate,
+    currentTime,
+    duration,
+    recordingStartTime,
+    videoCount,
+    currentVideoIndex,
+  ])
 
   const loadFromStorage = useCallback(() => {
     try {
@@ -117,6 +138,8 @@ export default function PedestrianCounterPage() {
           setCurrentTime(parsedData.currentTime || 0)
           setDuration(parsedData.duration || 0)
           setRecordingStartTime(parsedData.recordingStartTime ? new Date(parsedData.recordingStartTime) : null)
+          setVideoCount(parsedData.videoCount || 1)
+          setCurrentVideoIndex(parsedData.currentVideoIndex || 0)
 
           return true
         }
@@ -129,6 +152,8 @@ export default function PedestrianCounterPage() {
         setCurrentTime(parsedData.currentTime || 0)
         setDuration(parsedData.duration || 0)
         setRecordingStartTime(parsedData.recordingStartTime ? new Date(parsedData.recordingStartTime) : null)
+        setVideoCount(parsedData.videoCount || 1)
+        setCurrentVideoIndex(parsedData.currentVideoIndex || 0)
 
         console.log("Data loaded from localStorage")
         return true
@@ -172,7 +197,7 @@ export default function PedestrianCounterPage() {
   }, [loadFromStorage])
 
   useEffect(() => {
-    if (!isDataLoaded || !videoSrc) return
+    if (!isDataLoaded) return
 
     saveToStorage()
 
@@ -187,7 +212,18 @@ export default function PedestrianCounterPage() {
         clearInterval(autoSaveIntervalRef.current)
       }
     }
-  }, [counts, log, videoSrc, intersections, playbackRate, saveToStorage, isDataLoaded, recordingStartTime])
+  }, [
+    counts,
+    log,
+    videoSrc,
+    intersections,
+    playbackRate,
+    saveToStorage,
+    isDataLoaded,
+    recordingStartTime,
+    videoCount,
+    currentVideoIndex,
+  ])
 
   useEffect(() => {
     const handleBeforeUnload = () => {
@@ -209,6 +245,22 @@ export default function PedestrianCounterPage() {
     }
   }, [saveToStorage])
 
+  // Handle video end detection
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    const handleVideoEnd = () => {
+      setIsPlaying(false)
+      setShowVideoEndPrompt(true)
+    }
+
+    video.addEventListener("ended", handleVideoEnd)
+    return () => {
+      video.removeEventListener("ended", handleVideoEnd)
+    }
+  }, [videoSrc])
+
   const formatActualTime = (date: Date) => {
     return date.toLocaleString("en-US", {
       year: "numeric",
@@ -226,74 +278,91 @@ export default function PedestrianCounterPage() {
       if (logEntries.length === 0) return []
 
       const intervalSize = 15
-      const groups: Record<number, GroupedEntry> = {}
+      const groups: Record<string, GroupedEntry> = {}
 
-      // Find the range of intervals we need to cover
-      const timestamps = logEntries.map((entry) => entry.timestamp)
-      const minTime = Math.min(...timestamps)
-      const maxTime = Math.max(...timestamps)
-
-      const startInterval = Math.floor(minTime / intervalSize) * intervalSize
-      const endInterval = Math.floor(maxTime / intervalSize) * intervalSize
-
-      // Create all intervals from start to end, even if empty
-      for (let intervalStart = startInterval; intervalStart <= endInterval; intervalStart += intervalSize) {
-        const intervalEnd = intervalStart + intervalSize
-
-        let intervalLabel: string
-        let actualStartTime: Date | undefined
-        let actualEndTime: Date | undefined
-
-        if (recordingStartTime) {
-          // Calculate actual times
-          actualStartTime = new Date(recordingStartTime.getTime() + intervalStart * 1000)
-          actualEndTime = new Date(recordingStartTime.getTime() + intervalEnd * 1000)
-          // Only show time, not date
-          const startTimeStr = actualStartTime.toLocaleTimeString("en-US", {
-            hour12: false,
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          })
-          const endTimeStr = actualEndTime.toLocaleTimeString("en-US", {
-            hour12: false,
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          })
-          intervalLabel = `${startTimeStr} - ${endTimeStr}`
-        } else {
-          // Use video timestamps
-          const startMinutes = Math.floor(intervalStart / 60)
-          const startSeconds = Math.floor(intervalStart % 60)
-          const endMinutes = Math.floor(intervalEnd / 60)
-          const endSeconds = Math.floor(intervalEnd % 60)
-          intervalLabel = `${startMinutes}:${startSeconds.toString().padStart(2, "0")}-${endMinutes}:${endSeconds.toString().padStart(2, "0")}`
-        }
-
-        groups[intervalStart] = {
-          interval: intervalLabel,
-          startTime: intervalStart,
-          endTime: intervalEnd,
-          directions: directions.reduce((acc, dir) => ({ ...acc, [dir.name]: 0 }), {}),
-          totalCount: 0,
-          actualStartTime,
-          actualEndTime,
-        }
-      }
-
-      // Now populate with actual data
+      // Group by video index first, then by time intervals
+      const videoGroups: Record<number, LogEntry[]> = {}
       logEntries.forEach((entry) => {
-        const intervalStart = Math.floor(entry.timestamp / intervalSize) * intervalSize
-
-        const direction = directions.find((d) => d.key === entry.key)
-        if (direction && groups[intervalStart]) {
-          groups[intervalStart].directions[direction.name]++
-          groups[intervalStart].totalCount++
+        if (!videoGroups[entry.videoIndex]) {
+          videoGroups[entry.videoIndex] = []
         }
+        videoGroups[entry.videoIndex].push(entry)
       })
 
-      return Object.values(groups).sort((a, b) => a.startTime - b.startTime)
+      // Process each video's data
+      Object.entries(videoGroups).forEach(([videoIndexStr, videoEntries]) => {
+        const videoIndex = Number.parseInt(videoIndexStr)
+        const timestamps = videoEntries.map((entry) => entry.timestamp)
+        const minTime = Math.min(...timestamps)
+        const maxTime = Math.max(...timestamps)
+
+        const startInterval = Math.floor(minTime / intervalSize) * intervalSize
+        const endInterval = Math.floor(maxTime / intervalSize) * intervalSize
+
+        // Create all intervals for this video
+        for (let intervalStart = startInterval; intervalStart <= endInterval; intervalStart += intervalSize) {
+          const intervalEnd = intervalStart + intervalSize
+          const groupKey = `${videoIndex}-${intervalStart}` // Keep videoIndex in groupKey for sorting
+
+          let intervalLabel: string
+          let actualStartTime: Date | undefined
+          let actualEndTime: Date | undefined
+
+          if (recordingStartTime) {
+            actualStartTime = new Date(recordingStartTime.getTime() + intervalStart * 1000)
+            actualEndTime = new Date(recordingStartTime.getTime() + intervalEnd * 1000)
+            const startTimeStr = actualStartTime.toLocaleTimeString("en-US", {
+              hour12: false,
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            })
+            const endTimeStr = actualEndTime.toLocaleTimeString("en-US", {
+              hour12: false,
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            })
+            intervalLabel = `${startTimeStr} - ${endTimeStr}` // Removed "Video X:"
+          } else {
+            const startMinutes = Math.floor(intervalStart / 60)
+            const startSeconds = Math.floor(intervalStart % 60)
+            const endMinutes = Math.floor(intervalEnd / 60)
+            const endSeconds = Math.floor(intervalEnd % 60)
+            intervalLabel = `${startMinutes}:${startSeconds.toString().padStart(2, "0")}-${endMinutes}:${endSeconds.toString().padStart(2, "0")}` // Removed "Video X:"
+          }
+
+          groups[groupKey] = {
+            interval: intervalLabel,
+            startTime: intervalStart,
+            endTime: intervalEnd,
+            directions: directions.reduce((acc, dir) => ({ ...acc, [dir.name]: 0 }), {}),
+            totalCount: 0,
+            actualStartTime,
+            actualEndTime,
+            videoIndex,
+          }
+        }
+
+        // Populate with actual data
+        videoEntries.forEach((entry) => {
+          const intervalStart = Math.floor(entry.timestamp / intervalSize) * intervalSize
+          const groupKey = `${entry.videoIndex}-${intervalStart}` // Use entry.videoIndex for groupKey
+
+          const direction = directions.find((d) => d.key === entry.key)
+          if (direction && groups[groupKey]) {
+            groups[groupKey].directions[direction.name]++
+            groups[groupKey].totalCount++
+          }
+        })
+      })
+
+      return Object.values(groups).sort((a, b) => {
+        if (a.videoIndex !== b.videoIndex) {
+          return a.videoIndex! - b.videoIndex!
+        }
+        return a.startTime - b.startTime
+      })
     },
     [recordingStartTime],
   )
@@ -304,14 +373,14 @@ export default function PedestrianCounterPage() {
       if (!directionConfig || !videoSrc || intersections.length !== 4) return
 
       const timestamp = videoRef.current?.currentTime ?? 0
-      setLog((prev) => [...prev, { key, timestamp }])
+      setLog((prev) => [...prev, { key, timestamp, videoIndex: currentVideoIndex }])
 
       const newCount = (counts[directionConfig.name] || 0) + 1
       setCounts((prev) => ({ ...prev, [directionConfig.name]: newCount }))
 
       setLastPressed({ key, direction: directionConfig.direction })
     },
-    [counts, videoSrc, intersections.length],
+    [counts, videoSrc, intersections.length, currentVideoIndex],
   )
 
   const handleUndo = useCallback(() => {
@@ -354,39 +423,38 @@ export default function PedestrianCounterPage() {
     setCurrentTime(0)
     setDuration(0)
     setRecordingStartTime(null)
+    setVideoCount(1)
+    setCurrentVideoIndex(0)
     clearStorage()
   }, [clearStorage])
 
-  const downloadCSV = useCallback(
-    (data: GroupedEntry[], filename: string) => {
-      try {
-        const csvRows = data.map((entry) => {
-          const keyCounts = [1, 2, 3, 4, 5, 6, 7, 8].map((keyNum) => {
-            const direction = directions.find((d) => d.key === keyNum.toString())
-            return direction ? entry.directions[direction.name] || 0 : 0
-          })
-          return [entry.interval, ...keyCounts].join(",")
+  const downloadCSV = useCallback((data: GroupedEntry[], filename: string) => {
+    try {
+      const csvRows = data.map((entry) => {
+        const keyCounts = [1, 2, 3, 4, 5, 6, 7, 8].map((keyNum) => {
+          const direction = directions.find((d) => d.key === keyNum.toString())
+          return direction ? entry.directions[direction.name] || 0 : 0
         })
+        return [entry.interval, ...keyCounts].join(",")
+      })
 
-        const header = "Time interval,1,2,3,4,5,6,7,8"
-        const csvContent = [header, ...csvRows].join("\n")
+      const header = "Time interval,1,2,3,4,5,6,7,8"
+      const csvContent = [header, ...csvRows].join("\n")
 
-        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
-        const link = document.createElement("a")
-        const url = URL.createObjectURL(blob)
-        link.setAttribute("href", url)
-        link.setAttribute("download", filename)
-        link.style.visibility = "hidden"
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        URL.revokeObjectURL(url)
-      } catch (error) {
-        console.error("Error downloading CSV:", error)
-      }
-    },
-    [recordingStartTime],
-  )
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+      const link = document.createElement("a")
+      const url = URL.createObjectURL(blob)
+      link.setAttribute("href", url)
+      link.setAttribute("download", filename)
+      link.style.visibility = "hidden"
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error("Error downloading CSV:", error)
+    }
+  }, [])
 
   const handleFinish = useCallback(() => {
     if (log.length === 0) return
@@ -403,7 +471,7 @@ export default function PedestrianCounterPage() {
 
       let filename: string
       if (recordingStartTime) {
-        const recordingDate = recordingStartTime.toISOString().slice(0, 10) // YYYY-MM-DD
+        const recordingDate = recordingStartTime.toISOString().slice(0, 10)
         filename = `pedestrian_counts_${recordingDate}_${timestamp}.csv`
       } else {
         filename = `pedestrian_counts_video_time_${timestamp}.csv`
@@ -437,30 +505,45 @@ export default function PedestrianCounterPage() {
     }
   }, [])
 
-  const handleVideoSelect = useCallback(
-    (src: string | null) => {
-      setVideoSrc(src)
-      setIntersections([])
-      if (src) {
-        // Reset all data for new video
-        setCounts(initialCounts)
-        setLog([])
-        setIsPlaying(false)
-        setPlaybackRate(1)
-        setCurrentTime(0)
-        setDuration(0)
-        setLastPressed(null)
-        setRecordingStartTime(null)
+  const handleVideoSelect = useCallback((src: string | null) => {
+    setVideoSrc(src)
+    setIntersections([])
+    if (src) {
+      // Only reset video-specific data, keep accumulated counts and log
+      setIsPlaying(false)
+      setPlaybackRate(1)
+      setCurrentTime(0)
+      setDuration(0)
+      setLastPressed(null)
+      setRecordingStartTime(null)
 
-        // Clear stored data immediately
-        clearStorage()
+      // Show time input dialog when new video is selected
+      setShowTimeInputDialog(true)
+    }
+  }, [])
 
-        // Show time input dialog when new video is selected
-        setShowTimeInputDialog(true)
-      }
-    },
-    [clearStorage],
-  )
+  const handleNewVideoUpload = useCallback(() => {
+    setShowVideoEndPrompt(false)
+    setCurrentVideoIndex(videoCount)
+    setVideoCount((prev) => prev + 1)
+
+    // Trigger file upload
+    const fileInput = document.getElementById("video-upload-hidden") as HTMLInputElement
+    fileInput?.click()
+  }, [videoCount])
+
+  const handleVideoEndExport = useCallback(() => {
+    setShowVideoEndPrompt(false)
+    handleFinish()
+  }, [handleFinish])
+
+  const handleReplayVideo = useCallback(() => {
+    setShowVideoEndPrompt(false)
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0
+      setCurrentTime(0)
+    }
+  }, [])
 
   const handleTimeInputConfirm = useCallback((startTime: Date) => {
     setRecordingStartTime(startTime)
@@ -637,12 +720,22 @@ export default function PedestrianCounterPage() {
         onSkip={handleTimeInputSkip}
       />
 
+      <VideoEndPrompt
+        isOpen={showVideoEndPrompt}
+        onUploadNew={handleNewVideoUpload}
+        onExport={handleVideoEndExport}
+        onReplay={handleReplayVideo}
+        totalCounts={totalCounts}
+        videoCount={videoCount}
+      />
+
       <ExportProgressModal
         isOpen={showExportModal}
         onComplete={handleExportComplete}
         totalEntries={log.length}
         groupedEntries={groupedData.length}
       />
+
       <HelpSidebar
         isOpen={showHelpSidebar}
         onClose={() => setShowHelpSidebar(false)}
