@@ -310,13 +310,15 @@ export default function VideoRestorePrompt({ isOpen, onVideoRestore, onDismiss, 
                     Choose Video File
                   </Button>
 
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-6">Supports MP4, WebM, Ogg • Max 2GB</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-6">
+                    Supports MP4, WebM, Ogg, AVI • Max 2GB
+                  </p>
                 </div>
 
                 <Input
                   ref={fileInputRef}
                   type="file"
-                  accept="video/mp4,video/webm,video/ogg"
+                  accept="video/mp4,video/webm,video/ogg,video/avi"
                   onChange={handleFileInputChange}
                   className="hidden"
                   style={{

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { X, Keyboard, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, ChevronLeft, Undo2 } from "lucide-react"
+import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, ChevronLeft, Undo2 } from "lucide-react"
 
 interface HelpSidebarProps {
   isOpen: boolean
@@ -157,8 +157,7 @@ export default function HelpSidebar({
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex-shrink-0">
             {!isCollapsed && (
               <div className="flex items-center gap-3">
-                <Keyboard className="h-5 w-5 text-blue-600" />
-                <h2 className="text-lg font-bold text-gray-800 dark:text-white">Keyboard Controls</h2>
+                <h2 className="text-lg font-bold text-gray-800 dark:text-white">Help & Shortcuts</h2>
               </div>
             )}
             <div className="flex items-center gap-2">
@@ -175,7 +174,7 @@ export default function HelpSidebar({
                 className="h-8 w-8 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-200"
                 title={isCollapsed ? "Expand sidebar" : "Close help"}
               >
-                {isCollapsed ? <ChevronLeft className="h-4 w-4" /> : <X className="h-4 w-4" />}
+                {isCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
               </Button>
             </div>
           </div>
@@ -274,6 +273,7 @@ export default function HelpSidebar({
                     <li>• Use arrow keys ← → to adjust playback speed</li>
                     <li>• When video ends, you can upload another video to continue counting</li>
                     <li>• All data from multiple videos will be combined in the export</li>
+                    <li>• Supported formats: MP4, WebM, Ogg, AVI</li>
                   </ul>
                 </div>
               </div>

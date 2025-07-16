@@ -759,6 +759,19 @@ export default function PedestrianCounterPage() {
           }}
         />
       )}
+      <input
+        type="file"
+        id="video-upload-hidden"
+        accept="video/mp4, video/webm, video/ogg, video/avi"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const file = (e.target as HTMLInputElement).files?.[0]
+          if (file) {
+            const url = URL.createObjectURL(file)
+            handleVideoSelect(url)
+          }
+        }}
+      />
     </>
   )
 }

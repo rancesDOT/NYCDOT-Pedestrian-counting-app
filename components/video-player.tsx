@@ -219,7 +219,7 @@ const VideoPlayer = React.forwardRef<HTMLVideoElement, VideoPlayerProps>(
                 <UploadCloud className="h-16 w-16 text-slate-400 mb-4 transition-transform duration-300 hover:scale-110" />
                 <p className="text-lg font-semibold mb-2 leading-tight">Drag & drop video here</p>
                 <p className="text-sm mb-4 leading-tight">or click anywhere to select a file</p>
-                <p className="text-xs text-slate-400 leading-tight">Supported formats: MP4, WebM, Ogg</p>
+                <p className="text-xs text-slate-400 leading-tight">Supported formats: MP4, WebM, Ogg, AVI</p>
 
                 <div className="mt-6 flex items-center gap-2 text-xs text-slate-500">
                   <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
@@ -230,7 +230,7 @@ const VideoPlayer = React.forwardRef<HTMLVideoElement, VideoPlayerProps>(
             <Input
               id="video-upload-hidden"
               type="file"
-              accept="video/mp4,video/webm,video/ogg"
+              accept="video/mp4,video/webm,video/ogg,video/avi"
               onChange={handleFileInputChange}
               className="hidden"
               style={{
