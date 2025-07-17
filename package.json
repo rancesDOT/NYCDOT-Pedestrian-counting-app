@@ -9,7 +9,7 @@
     "start": "next start"
   },
   "dependencies": {
-    "@ffmpeg/ffmpeg": "^0.12.10",
+    "@ffmpeg/ffmpeg": "latest",
     "@ffmpeg/util": "^0.12.1",
     "@radix-ui/react-alert-dialog": "^1.0.5",
     "@radix-ui/react-dialog": "latest",

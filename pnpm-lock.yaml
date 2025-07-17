@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@ffmpeg/ffmpeg':
-        specifier: ^0.12.10
-        version: 0.12.10
+        specifier: latest
+        version: 0.12.15
       '@ffmpeg/util':
         specifier: ^0.12.1
         version: 0.12.1
@@ -115,8 +115,8 @@ packages:
     resolution: {integrity: sha512-HxjQ8Qn+4SI3/AFv6sOrDB+g6PpUTDwSJiQqOrnneEk8L71161srI9gjzzZvYVbzHiVg/BvcH95+cK/zfIt4pg==}
     engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
 
-  '@ffmpeg/ffmpeg@0.12.10':
-    resolution: {integrity: sha512-lVtk8PW8e+NUzGZhPTWj2P1J4/NyuCrbDD3O9IGpSeLYtUZKBqZO8CNj1WYGghep/MXoM8e1qVY1GztTkf8YYQ==}
+  '@ffmpeg/ffmpeg@0.12.15':
+    resolution: {integrity: sha512-1C8Obr4GsN3xw+/1Ww6PFM84wSQAGsdoTuTWPOj2OizsRDLT4CXTaVjPhkw6ARyDus1B9X/L2LiXHqYYsGnRFw==}
     engines: {node: '>=18.x'}
 
   '@ffmpeg/types@0.12.4':
@@ -2274,7 +2274,7 @@ snapshots:
 
   '@eslint/js@8.51.0': {}
 
-  '@ffmpeg/ffmpeg@0.12.10':
+  '@ffmpeg/ffmpeg@0.12.15':
     dependencies:
       '@ffmpeg/types': 0.12.4
 
@@ -3234,7 +3234,7 @@ snapshots:
       eslint: 8.51.0
       eslint-import-resolver-node: 0.3.9
       eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0(eslint@8.51.0))(eslint@8.51.0)
-      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@6.21.0(eslint@8.51.0)(typescript@5.0.2))(eslint-import-resolver-typescript@3.10.1)(eslint@8.51.0)
+      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@6.21.0(eslint@8.51.0)(typescript@5.0.2))(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@8.51.0))(eslint@8.51.0))(eslint@8.51.0)
       eslint-plugin-jsx-a11y: 6.10.2(eslint@8.51.0)
       eslint-plugin-react: 7.37.5(eslint@8.51.0)
       eslint-plugin-react-hooks: 5.0.0-canary-7118f5dd7-20230705(eslint@8.51.0)
@@ -3264,7 +3264,7 @@ snapshots:
       tinyglobby: 0.2.14
       unrs-resolver: 1.11.1
     optionalDependencies:
-      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@6.21.0(eslint@8.51.0)(typescript@5.0.2))(eslint-import-resolver-typescript@3.10.1)(eslint@8.51.0)
+      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@6.21.0(eslint@8.51.0)(typescript@5.0.2))(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@8.51.0))(eslint@8.51.0))(eslint@8.51.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -3279,7 +3279,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-plugin-import@2.32.0(@typescript-eslint/parser@6.21.0(eslint@8.51.0)(typescript@5.0.2))(eslint-import-resolver-typescript@3.10.1)(eslint@8.51.0):
+  eslint-plugin-import@2.32.0(@typescript-eslint/parser@6.21.0(eslint@8.51.0)(typescript@5.0.2))(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@8.51.0))(eslint@8.51.0))(eslint@8.51.0):
     dependencies:
       '@rtsao/scc': 1.1.0
       array-includes: 3.1.9

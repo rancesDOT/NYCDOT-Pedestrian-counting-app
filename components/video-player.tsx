@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { UploadCloud, RotateCcw, AlertTriangle, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import VideoOverlay from "./video-overlay"
+import VideoConversionModal from "./video-conversion-modal"
 
 interface Intersection {
   id: string
@@ -36,6 +37,8 @@ const VideoPlayer = React.forwardRef<HTMLVideoElement, VideoPlayerProps>(
     const internalRef = React.useRef<HTMLVideoElement>(null)
     const [videoError, setVideoError] = useState<string | null>(null)
     const [showFormatInfo, setShowFormatInfo] = useState(false)
+    const [showConversionModal, setShowConversionModal] = useState(false)
+    const [pendingAviFile, setPendingAviFile] = useState<File | null>(null)
 
     useImperativeHandle(ref, () => internalRef.current as HTMLVideoElement)
 
@@ -86,10 +89,8 @@ const VideoPlayer = React.forwardRef<HTMLVideoElement, VideoPlayerProps>(
         if (file && file.type.startsWith("video/")) {
           // Check if it's an AVI file
           if (isAviFile(file)) {
-            setVideoError(
-              "AVI files are not supported in this environment. Please convert your AVI file to MP4 using a tool like VLC Media Player, HandBrake, or an online converter, then upload the MP4 file.",
-            )
-            setShowFormatInfo(true)
+            setPendingAviFile(file)
+            setShowConversionModal(true)
             return
           }
 
@@ -120,6 +121,31 @@ const VideoPlayer = React.forwardRef<HTMLVideoElement, VideoPlayerProps>(
       },
       [onVideoSelect, validateVideoFormat, isAviFile],
     )
+
+    const handleConversionComplete = useCallback(
+      (convertedFile: File) => {
+        const url = URL.createObjectURL(convertedFile)
+
+        // Clear any existing saved data before setting new video
+        try {
+          localStorage.removeItem("pedestrian-counter-data")
+        } catch (error) {
+          console.error("Error clearing saved data:", error)
+        }
+
+        onVideoSelect(url)
+        setTimeout(() => {
+          const labelButton = document.querySelector("[data-label-intersections]") as HTMLButtonElement
+          labelButton?.click()
+        }, 100)
+      },
+      [onVideoSelect],
+    )
+
+    const handleConversionClose = useCallback(() => {
+      setShowConversionModal(false)
+      setPendingAviFile(null)
+    }, [])
 
     const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault()
@@ -348,9 +374,12 @@ const VideoPlayer = React.forwardRef<HTMLVideoElement, VideoPlayerProps>(
                       <span className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-1 rounded text-xs font-medium">
                         OGG ✓
                       </span>
+                      <span className="bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 px-2 py-1 rounded text-xs font-medium">
+                        AVI ⚡
+                      </span>
                     </div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                      AVI files need to be converted first
+                      AVI files will be converted to MP4
                     </p>
                   </div>
 
@@ -363,7 +392,7 @@ const VideoPlayer = React.forwardRef<HTMLVideoElement, VideoPlayerProps>(
               <Input
                 id="video-upload-hidden"
                 type="file"
-                accept="video/mp4,video/webm,video/ogg"
+                accept="video/mp4,video/webm,video/ogg,video/avi"
                 onChange={handleFileInputChange}
                 className="hidden"
                 style={{
@@ -380,6 +409,12 @@ const VideoPlayer = React.forwardRef<HTMLVideoElement, VideoPlayerProps>(
             </div>
           </CardContent>
         </Card>
+        <VideoConversionModal
+          isOpen={showConversionModal}
+          onClose={handleConversionClose}
+          onConversionComplete={handleConversionComplete}
+          aviFile={pendingAviFile}
+        />
       </>
     )
   },
