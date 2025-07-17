@@ -1,424 +1,253 @@
 "use client"
 
-import React, { useState, useImperativeHandle, useCallback } from "react"
-import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { UploadCloud, RotateCcw, AlertTriangle, Info } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import VideoOverlay from "./video-overlay"
-import VideoConversionModal from "./video-conversion-modal"
+import type React from "react"
 
-interface Intersection {
-  id: string
-  x: number
-  y: number
-  label: string
-}
+import { forwardRef, useState, useCallback, useRef } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { X, Check, MoveHorizontal, MoveVertical } from "lucide-react"
+import VideoOverlay from "@/components/video-overlay"
+import FileVideo from "lucide-react" // Declared the FileVideo variable
 
 interface VideoPlayerProps {
   videoSrc: string | null
-  onVideoSelect: (src: string | null) => void
+  onVideoSelect: (file: File | null) => void // Changed to accept File object
   onPlay: () => void
   onPause: () => void
   lastPressed: { key: string; direction: string } | null
-  onIntersectionsSet: (intersections: Intersection[]) => void
+  onIntersectionsSet: (intersections: { id: string; x: number; y: number; label: string }[]) => void
   onTimeUpdate: () => void
   onLoadedMetadata: () => void
 }
 
-const VideoPlayer = React.forwardRef<HTMLVideoElement, VideoPlayerProps>(
+const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(
   (
     { videoSrc, onVideoSelect, onPlay, onPause, lastPressed, onIntersectionsSet, onTimeUpdate, onLoadedMetadata },
     ref,
   ) => {
     const [isDragging, setIsDragging] = useState(false)
-    const [dragCounter, setDragCounter] = useState(0)
-    const [showRestoreNotification, setShowRestoreNotification] = useState(false)
-    const internalRef = React.useRef<HTMLVideoElement>(null)
-    const [videoError, setVideoError] = useState<string | null>(null)
-    const [showFormatInfo, setShowFormatInfo] = useState(false)
-    const [showConversionModal, setShowConversionModal] = useState(false)
-    const [pendingAviFile, setPendingAviFile] = useState<File | null>(null)
+    const [currentIntersection, setCurrentIntersection] = useState<{
+      id: string
+      x: number
+      y: number
+      label: string
+    } | null>(null)
+    const [intersections, setIntersections] = useState<{ id: string; x: number; y: number; label: string }[]>([])
+    const videoContainerRef = useRef<HTMLDivElement>(null)
 
-    useImperativeHandle(ref, () => internalRef.current as HTMLVideoElement)
-
-    React.useEffect(() => {
-      if (videoSrc) {
-        try {
-          const savedData = localStorage.getItem("pedestrian-counter-data")
-          if (savedData) {
-            const parsedData = JSON.parse(savedData)
-            if (
-              parsedData.videoSrc === videoSrc &&
-              (parsedData.log?.length > 0 || parsedData.intersections?.length > 0)
-            ) {
-              setShowRestoreNotification(true)
-              setTimeout(() => setShowRestoreNotification(false), 10000)
-            }
-          }
-        } catch (error) {
-          console.error("Error checking saved data:", error)
+    const handleFileChange = useCallback(
+      (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0]
+        if (file) {
+          onVideoSelect(file) // Pass the file object
+          setIntersections([]) // Reset intersections for new video
         }
-      }
-    }, [videoSrc])
-
-    const isAviFile = useCallback((file: File): boolean => {
-      return file.type === "video/x-msvideo" || file.name.toLowerCase().endsWith(".avi")
-    }, [])
-
-    const validateVideoFormat = useCallback((file: File): boolean => {
-      const supportedTypes = ["video/mp4", "video/webm", "video/ogg"]
-
-      // Check MIME type first
-      if (supportedTypes.includes(file.type)) {
-        return true
-      }
-
-      // Check file extension as fallback
-      const extension = file.name.toLowerCase().split(".").pop()
-      const supportedExtensions = ["mp4", "webm", "ogg"]
-
-      return supportedExtensions.includes(extension || "")
-    }, [])
-
-    const handleFileSelect = useCallback(
-      (file: File | null) => {
-        setVideoError(null)
-        setShowFormatInfo(false)
-
-        if (file && file.type.startsWith("video/")) {
-          // Check if it's an AVI file
-          if (isAviFile(file)) {
-            setPendingAviFile(file)
-            setShowConversionModal(true)
-            return
-          }
-
-          // Validate format for other video types
-          if (!validateVideoFormat(file)) {
-            setVideoError(
-              `Unsupported video format: ${file.name}. Please use MP4, WebM, or OGG format. For best compatibility, we recommend MP4.`,
-            )
-            setShowFormatInfo(true)
-            return
-          }
-
-          const url = URL.createObjectURL(file)
-
-          // Clear any existing saved data before setting new video
-          try {
-            localStorage.removeItem("pedestrian-counter-data")
-          } catch (error) {
-            console.error("Error clearing saved data:", error)
-          }
-
-          onVideoSelect(url)
-          setTimeout(() => {
-            const labelButton = document.querySelector("[data-label-intersections]") as HTMLButtonElement
-            labelButton?.click()
-          }, 100)
-        }
-      },
-      [onVideoSelect, validateVideoFormat, isAviFile],
-    )
-
-    const handleConversionComplete = useCallback(
-      (convertedFile: File) => {
-        const url = URL.createObjectURL(convertedFile)
-
-        // Clear any existing saved data before setting new video
-        try {
-          localStorage.removeItem("pedestrian-counter-data")
-        } catch (error) {
-          console.error("Error clearing saved data:", error)
-        }
-
-        onVideoSelect(url)
-        setTimeout(() => {
-          const labelButton = document.querySelector("[data-label-intersections]") as HTMLButtonElement
-          labelButton?.click()
-        }, 100)
       },
       [onVideoSelect],
     )
 
-    const handleConversionClose = useCallback(() => {
-      setShowConversionModal(false)
-      setPendingAviFile(null)
-    }, [])
+    const handleMouseDown = useCallback(
+      (event: React.MouseEvent<HTMLDivElement>) => {
+        if (intersections.length >= 4) return
 
-    const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-      e.preventDefault()
-      e.stopPropagation()
-      setDragCounter((prev) => prev + 1)
-      setIsDragging(true)
-    }, [])
-
-    const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-      e.preventDefault()
-      e.stopPropagation()
-      setDragCounter((prev) => {
-        const newCounter = prev - 1
-        if (newCounter === 0) setIsDragging(false)
-        return newCounter
-      })
-    }, [])
-
-    const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-      e.preventDefault()
-      e.stopPropagation()
-    }, [])
-
-    const handleDrop = useCallback(
-      (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault()
-        e.stopPropagation()
-        setIsDragging(false)
-        setDragCounter(0)
-
-        const files = e.dataTransfer.files
-        if (files.length > 0) handleFileSelect(files[0])
+        setIsDragging(true)
+        const rect = videoContainerRef.current?.getBoundingClientRect()
+        if (rect) {
+          const x = event.clientX - rect.left
+          const y = event.clientY - rect.top
+          const newId = `intersection-${intersections.length + 1}`
+          const newLabel = `Point ${intersections.length + 1}`
+          setCurrentIntersection({ id: newId, x, y, label: newLabel })
+        }
       },
-      [handleFileSelect],
+      [intersections.length],
     )
 
-    const handleFileInputChange = useCallback(
-      (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (file) handleFileSelect(file)
-        // Reset the input value so the same file can be selected again
-        e.target.value = ""
+    const handleMouseMove = useCallback(
+      (event: React.MouseEvent<HTMLDivElement>) => {
+        if (!isDragging || !currentIntersection) return
+
+        const rect = videoContainerRef.current?.getBoundingClientRect()
+        if (rect) {
+          const x = event.clientX - rect.left
+          const y = event.clientY - rect.top
+          setCurrentIntersection((prev) => (prev ? { ...prev, x, y } : null))
+        }
       },
-      [handleFileSelect],
+      [isDragging, currentIntersection],
     )
 
-    const clearSavedData = useCallback(() => {
-      try {
-        localStorage.removeItem("pedestrian-counter-data")
-        setShowRestoreNotification(false)
-        window.location.reload()
-      } catch (error) {
-        console.error("Error clearing saved data:", error)
+    const handleMouseUp = useCallback(() => {
+      if (isDragging && currentIntersection) {
+        setIntersections((prev) => {
+          const newIntersections = [...prev, currentIntersection]
+          onIntersectionsSet(newIntersections)
+          return newIntersections
+        })
+        setCurrentIntersection(null)
       }
-    }, [])
+      setIsDragging(false)
+    }, [isDragging, currentIntersection, onIntersectionsSet])
 
-    const handleVideoError = useCallback(() => {
-      setVideoError("Unable to load video. Please try a different file or check that the video file is not corrupted.")
-      onVideoSelect(null)
-    }, [onVideoSelect])
+    const handleClearIntersections = useCallback(() => {
+      setIntersections([])
+      onIntersectionsSet([])
+    }, [onIntersectionsSet])
 
-    const handleTryAgain = useCallback(() => {
-      setVideoError(null)
-      setShowFormatInfo(false)
-      document.getElementById("video-upload-hidden")?.click()
-    }, [])
+    const handleConfirmIntersections = useCallback(() => {
+      // Logic to confirm intersections, perhaps close a setup mode
+      // For now, just log and indicate they are set
+      console.log("Intersections confirmed:", intersections)
+    }, [intersections])
+
+    const renderIntersectionPoint = (point: { id: string; x: number; y: number; label: string }) => (
+      <div
+        key={point.id}
+        className="absolute w-4 h-4 bg-blue-500 rounded-full border-2 border-white flex items-center justify-center text-xs text-white font-bold"
+        style={{ left: point.x - 8, top: point.y - 8 }}
+        title={point.label}
+      >
+        {point.id.split("-")[1]}
+      </div>
+    )
+
+    const renderLine = (p1: { x: number; y: number }, p2: { x: number; y: number }, label: string) => {
+      const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x) * (180 / Math.PI)
+      const length = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2))
+      const midX = (p1.x + p2.x) / 2
+      const midY = (p1.y + p2.y) / 2
+
+      return (
+        <div
+          key={`${p1.id}-${p2.id}`}
+          className="absolute bg-red-500 opacity-70"
+          style={{
+            left: p1.x,
+            top: p1.y,
+            width: length,
+            height: "2px",
+            transformOrigin: "0 0",
+            transform: `rotate(${angle}deg)`,
+          }}
+        >
+          <span
+            className="absolute text-xs text-white bg-red-600 px-1 py-0.5 rounded"
+            style={{
+              left: length / 2 - 20, // Adjust to center label
+              top: -15, // Position above the line
+              transform: `rotate(${-angle}deg)`, // Counter-rotate label
+            }}
+          >
+            {label}
+          </span>
+        </div>
+      )
+    }
+
+    const renderDirectionArrow = (p1: { x: number; y: number }, p2: { x: number; y: number }, direction: string) => {
+      const midX = (p1.x + p2.x) / 2
+      const midY = (p1.y + p2.y) / 2
+
+      let arrowRotation = 0
+      let arrowComponent = null
+
+      // Determine arrow direction based on line orientation and label
+      if (direction === "North" || direction === "South") {
+        arrowComponent = <MoveVertical className="h-4 w-4" />
+        if (direction === "North")
+          arrowRotation = -90 // Arrow pointing up
+        else arrowRotation = 90 // Arrow pointing down
+      } else if (direction === "East" || direction === "West") {
+        arrowComponent = <MoveHorizontal className="h-4 w-4" />
+        if (direction === "East")
+          arrowRotation = 0 // Arrow pointing right
+        else arrowRotation = 180 // Arrow pointing left
+      }
+
+      return (
+        <div
+          key={`arrow-${p1.id}-${p2.id}`}
+          className="absolute text-green-400"
+          style={{
+            left: midX - 10, // Center arrow
+            top: midY - 10, // Center arrow
+            transform: `rotate(${arrowRotation}deg)`,
+          }}
+        >
+          {arrowComponent}
+        </div>
+      )
+    }
+
+    const isIntersectionsSet = intersections.length === 4
 
     return (
-      <>
-        <Card className="h-full w-full flex flex-col shadow-lg rounded-b-none rounded-t-lg relative">
-          {showRestoreNotification && (
-            <div className="absolute top-4 right-4 z-50 bg-blue-50 border border-blue-200 rounded-lg p-4 shadow-lg max-w-sm animate-in slide-in-from-top duration-300">
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0">
-                  <RotateCcw className="h-5 w-5 text-blue-600 mt-0.5" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="text-sm font-semibold text-blue-800 mb-1">Previous Session Restored</h4>
-                  <p className="text-xs text-blue-700 mb-3">
-                    Your counting data and intersections have been automatically restored from your last session.
+      <Card className="w-full h-full flex flex-col">
+        <CardContent className="flex-grow p-0 relative overflow-hidden">
+          {!videoSrc ? (
+            <div className="flex flex-col items-center justify-center h-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
+              <FileVideo className="h-16 w-16 mb-4" />
+              <p className="text-lg mb-4">No video loaded</p>
+              <input
+                id="video-upload"
+                type="file"
+                accept="video/mp4, video/webm, video/ogg, video/x-msvideo, .avi" // Added .avi
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <Button onClick={() => document.getElementById("video-upload")?.click()}>Select Video</Button>
+            </div>
+          ) : (
+            <div
+              ref={videoContainerRef}
+              className="relative w-full h-full bg-black flex items-center justify-center"
+              onMouseDown={isIntersectionsSet ? undefined : handleMouseDown}
+              onMouseMove={isIntersectionsSet ? undefined : handleMouseMove}
+              onMouseUp={isIntersectionsSet ? undefined : handleMouseUp}
+              onMouseLeave={isIntersectionsSet ? undefined : handleMouseUp} // End drag if mouse leaves
+            >
+              <video
+                ref={ref}
+                src={videoSrc}
+                className="max-w-full max-h-full object-contain"
+                onPlay={onPlay}
+                onPause={onPause}
+                onTimeUpdate={onTimeUpdate}
+                onLoadedMetadata={onLoadedMetadata}
+                controls={false} // Controls are handled by VideoControls component
+              />
+
+              <VideoOverlay
+                intersections={intersections}
+                currentIntersection={currentIntersection}
+                lastPressed={lastPressed}
+              />
+
+              {/* Intersection setup UI */}
+              {!isIntersectionsSet && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 text-white p-4">
+                  <h3 className="text-xl font-semibold mb-2">Set up Intersection Points</h3>
+                  <p className="text-sm text-center mb-4">
+                    Click on the video to mark 4 points that define your intersection.
                   </p>
                   <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setShowRestoreNotification(false)}
-                      className="text-xs h-7 px-2"
-                    >
-                      Got it
+                    <Button onClick={handleClearIntersections} variant="destructive" size="sm">
+                      <X className="h-4 w-4 mr-2" /> Clear Points
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={clearSavedData}
-                      className="text-xs h-7 px-2 text-red-600 border-red-200 hover:bg-red-50 bg-transparent"
-                    >
-                      Start Fresh
+                    <Button onClick={handleConfirmIntersections} disabled={intersections.length !== 4} size="sm">
+                      <Check className="h-4 w-4 mr-2" /> Confirm Points
                     </Button>
-                  </div>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowRestoreNotification(false)}
-                  className="h-6 w-6 text-blue-600 hover:bg-blue-100 flex-shrink-0"
-                >
-                  ×
-                </Button>
-              </div>
-            </div>
-          )}
-
-          <CardContent className="p-4 flex-grow flex flex-col min-h-0">
-            <div
-              className={`relative flex-grow rounded-lg flex items-center justify-center border-2 border-dashed transition-all duration-300 overflow-hidden ${
-                !videoSrc ? "cursor-pointer" : ""
-              } ${
-                isDragging
-                  ? "border-primary bg-primary/10 scale-[1.02]"
-                  : "bg-slate-200 dark:bg-slate-800/50 border-slate-300 dark:border-slate-700" +
-                    (!videoSrc ? " hover:border-primary/50 hover:bg-primary/5 hover:scale-[1.01]" : "")
-              }`}
-              {...(!videoSrc && {
-                onDragEnter: handleDragEnter,
-                onDragLeave: handleDragLeave,
-                onDragOver: handleDragOver,
-                onDrop: handleDrop,
-                onClick: () => document.getElementById("video-upload-hidden")?.click(),
-              })}
-            >
-              {videoError ? (
-                <div className="text-center p-8 select-none flex flex-col items-center justify-center w-full h-full max-w-2xl mx-auto">
-                  <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mb-4">
-                    <AlertTriangle className="h-8 w-8 text-red-600 dark:text-red-400" />
-                  </div>
-                  <p className="text-lg font-semibold mb-3 leading-tight text-red-700 dark:text-red-300">
-                    Video Format Issue
-                  </p>
-                  <p className="text-sm mb-6 leading-relaxed max-w-md text-red-600 dark:text-red-400">{videoError}</p>
-
-                  {showFormatInfo && (
-                    <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg max-w-md">
-                      <div className="flex items-start gap-3">
-                        <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                        <div>
-                          <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2">
-                            How to Convert AVI to MP4:
-                          </h4>
-                          <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
-                            <li>
-                              • <strong>VLC Media Player:</strong> Media → Convert/Save → Add file → Convert
-                            </li>
-                            <li>
-                              • <strong>HandBrake:</strong> Free, open-source video converter
-                            </li>
-                            <li>
-                              • <strong>Online:</strong> CloudConvert, Online-Convert, or similar
-                            </li>
-                            <li>
-                              • <strong>Windows:</strong> Use built-in Photos app or Movies & TV
-                            </li>
-                          </ul>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex gap-3">
-                    <Button onClick={handleTryAgain} className="bg-blue-600 hover:bg-blue-700">
-                      Choose Different File
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setVideoError(null)
-                        setShowFormatInfo(false)
-                      }}
-                      className="bg-transparent"
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-4 leading-tight">
-                    Supported formats: <strong>MP4</strong> (recommended), WebM, OGG
-                  </p>
-                </div>
-              ) : videoSrc ? (
-                <div className="relative w-full h-full">
-                  <video
-                    ref={internalRef}
-                    src={videoSrc}
-                    className="w-full h-full object-contain rounded-md"
-                    onPlay={onPlay}
-                    onPause={onPause}
-                    onError={handleVideoError}
-                    controls={false}
-                    preload="metadata"
-                    onTimeUpdate={onTimeUpdate}
-                    onLoadedMetadata={onLoadedMetadata}
-                  />
-                  <VideoOverlay
-                    videoRef={internalRef}
-                    isVideoLoaded={!!videoSrc}
-                    lastPressed={lastPressed}
-                    onIntersectionsSet={onIntersectionsSet}
-                  />
-                </div>
-              ) : (
-                <div className="text-center text-muted-foreground p-8 select-none flex flex-col items-center justify-center w-full h-full">
-                  <UploadCloud className="h-16 w-16 text-slate-400 mb-4 transition-transform duration-300 hover:scale-110" />
-                  <p className="text-lg font-semibold mb-2 leading-tight">Drag & drop video here</p>
-                  <p className="text-sm mb-4 leading-tight">or click anywhere to select a file</p>
-
-                  <div className="bg-slate-100 dark:bg-slate-700 rounded-lg px-4 py-3 mb-4 max-w-sm">
-                    <p className="text-xs text-slate-600 dark:text-slate-300 mb-2">
-                      <strong>Supported formats:</strong>
-                    </p>
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-1 rounded text-xs font-medium">
-                        MP4 ✓
-                      </span>
-                      <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded text-xs font-medium">
-                        WebM ✓
-                      </span>
-                      <span className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-1 rounded text-xs font-medium">
-                        OGG ✓
-                      </span>
-                      <span className="bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 px-2 py-1 rounded text-xs font-medium">
-                        AVI ⚡
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                      AVI files will be converted to MP4
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
-                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
-                    <span>Click or drag to get started</span>
                   </div>
                 </div>
               )}
-              <Input
-                id="video-upload-hidden"
-                type="file"
-                accept="video/mp4,video/webm,video/ogg,video/avi"
-                onChange={handleFileInputChange}
-                className="hidden"
-                style={{
-                  position: "absolute",
-                  left: "-9999px",
-                  width: "1px",
-                  height: "1px",
-                  opacity: 0,
-                  pointerEvents: "none",
-                }}
-                tabIndex={-1}
-                aria-hidden="true"
-              />
             </div>
-          </CardContent>
-        </Card>
-        <VideoConversionModal
-          isOpen={showConversionModal}
-          onClose={handleConversionClose}
-          onConversionComplete={handleConversionComplete}
-          aviFile={pendingAviFile}
-        />
-      </>
+          )}
+        </CardContent>
+      </Card>
     )
   },
 )
 
 VideoPlayer.displayName = "VideoPlayer"
+
 export default VideoPlayer

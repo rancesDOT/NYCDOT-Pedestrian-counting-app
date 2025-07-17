@@ -8,6 +8,7 @@ import HelpSidebar from "@/components/help-sidebar"
 import VideoRestorePrompt from "@/components/video-restore-prompt"
 import VideoTimeInputDialog from "@/components/video-time-input-dialog"
 import VideoEndPrompt from "@/components/video-end-prompt"
+import VideoConversionModal from "@/components/video-conversion-modal" // Import the new modal
 import { directionsConfig as directions } from "@/lib/key-mappings"
 
 interface Intersection {
@@ -77,6 +78,10 @@ export default function PedestrianCounterPage() {
 
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
+
+  // State for AVI conversion
+  const [showConversionModal, setShowConversionModal] = useState(false)
+  const [aviFileToConvert, setAviFileToConvert] = useState<File | null>(null)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const autoSaveIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -495,10 +500,22 @@ export default function PedestrianCounterPage() {
     }
   }, [])
 
-  const handleVideoSelect = useCallback((src: string | null) => {
-    setVideoSrc(src)
-    setIntersections([])
-    if (src) {
+  const handleVideoFileSelect = useCallback((file: File | null) => {
+    if (!file) {
+      setVideoSrc(null)
+      setIntersections([])
+      return
+    }
+
+    // Check if the file is an AVI
+    if (file.type === "video/x-msvideo" || file.name.toLowerCase().endsWith(".avi")) {
+      setAviFileToConvert(file)
+      setShowConversionModal(true)
+    } else {
+      // For MP4, WebM, Ogg
+      const url = URL.createObjectURL(file)
+      setVideoSrc(url)
+      setIntersections([])
       // Only reset video-specific data, keep accumulated counts and log
       setIsPlaying(false)
       setPlaybackRate(1)
@@ -506,10 +523,24 @@ export default function PedestrianCounterPage() {
       setDuration(0)
       setLastPressed(null)
       setRecordingStartTime(null)
-
       // Show time input dialog when new video is selected
       setShowTimeInputDialog(true)
     }
+  }, [])
+
+  const handleConversionComplete = useCallback((convertedFile: File) => {
+    const url = URL.createObjectURL(convertedFile)
+    setVideoSrc(url)
+    setIntersections([])
+    setIsPlaying(false)
+    setPlaybackRate(1)
+    setCurrentTime(0)
+    setDuration(0)
+    setLastPressed(null)
+    setRecordingStartTime(null)
+    setShowTimeInputDialog(true) // Prompt for start time after conversion
+    setAviFileToConvert(null) // Clear the AVI file
+    setShowConversionModal(false) // Close the modal
   }, [])
 
   const handleNewVideoUpload = useCallback(() => {
@@ -671,7 +702,7 @@ export default function PedestrianCounterPage() {
           <VideoPlayer
             ref={videoRef}
             videoSrc={videoSrc}
-            onVideoSelect={handleVideoSelect}
+            onVideoSelect={handleVideoFileSelect} // Updated to handle file object
             onPlay={() => setIsPlaying(true)}
             onPause={() => setIsPlaying(false)}
             lastPressed={lastPressed}
@@ -749,16 +780,24 @@ export default function PedestrianCounterPage() {
           }}
         />
       )}
+
+      {/* Video Conversion Modal */}
+      <VideoConversionModal
+        isOpen={showConversionModal}
+        onClose={() => setShowConversionModal(false)}
+        onConversionComplete={handleConversionComplete}
+        aviFile={aviFileToConvert}
+      />
+
       <input
         type="file"
         id="video-upload-hidden"
-        accept="video/mp4, video/webm, video/ogg"
+        accept="video/mp4, video/webm, video/ogg, video/x-msvideo, .avi" // Added .avi and video/x-msvideo
         style={{ display: "none" }}
         onChange={(e) => {
           const file = (e.target as HTMLInputElement).files?.[0]
           if (file) {
-            const url = URL.createObjectURL(file)
-            handleVideoSelect(url)
+            handleVideoFileSelect(file) // Pass the file object directly
           }
           // Reset the input value
           e.target.value = ""
