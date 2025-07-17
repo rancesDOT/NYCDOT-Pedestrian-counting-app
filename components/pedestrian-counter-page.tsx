@@ -79,7 +79,6 @@ export default function PedestrianCounterPage() {
   const [duration, setDuration] = useState(0)
 
   const videoRef = useRef<HTMLVideoElement>(null)
-  const helpButtonRef = useRef<HTMLButtonElement>(null)
   const autoSaveIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const saveToStorage = useCallback(() => {
@@ -124,6 +123,7 @@ export default function PedestrianCounterPage() {
         const maxAge = 7 * 24 * 60 * 60 * 1000
         if (Date.now() - parsedData.lastSaved > maxAge) {
           console.log("Saved data is too old, starting fresh")
+          localStorage.removeItem(STORAGE_KEY)
           return false
         }
 
@@ -160,6 +160,8 @@ export default function PedestrianCounterPage() {
       }
     } catch (error) {
       console.error("Failed to load data from localStorage:", error)
+      // Clear corrupted data
+      localStorage.removeItem(STORAGE_KEY)
     }
     return false
   }, [])
@@ -261,18 +263,6 @@ export default function PedestrianCounterPage() {
     }
   }, [videoSrc])
 
-  const formatActualTime = (date: Date) => {
-    return date.toLocaleString("en-US", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    })
-  }
-
   const groupDataBy15Seconds = useCallback(
     (logEntries: LogEntry[]): GroupedEntry[] => {
       if (logEntries.length === 0) return []
@@ -302,7 +292,7 @@ export default function PedestrianCounterPage() {
         // Create all intervals for this video
         for (let intervalStart = startInterval; intervalStart <= endInterval; intervalStart += intervalSize) {
           const intervalEnd = intervalStart + intervalSize
-          const groupKey = `${videoIndex}-${intervalStart}` // Keep videoIndex in groupKey for sorting
+          const groupKey = `${videoIndex}-${intervalStart}`
 
           let intervalLabel: string
           let actualStartTime: Date | undefined
@@ -323,13 +313,13 @@ export default function PedestrianCounterPage() {
               minute: "2-digit",
               second: "2-digit",
             })
-            intervalLabel = `${startTimeStr} - ${endTimeStr}` // Removed "Video X:"
+            intervalLabel = `${startTimeStr} - ${endTimeStr}`
           } else {
             const startMinutes = Math.floor(intervalStart / 60)
             const startSeconds = Math.floor(intervalStart % 60)
             const endMinutes = Math.floor(intervalEnd / 60)
             const endSeconds = Math.floor(intervalEnd % 60)
-            intervalLabel = `${startMinutes}:${startSeconds.toString().padStart(2, "0")}-${endMinutes}:${endSeconds.toString().padStart(2, "0")}` // Removed "Video X:"
+            intervalLabel = `${startMinutes}:${startSeconds.toString().padStart(2, "0")}-${endMinutes}:${endSeconds.toString().padStart(2, "0")}`
           }
 
           groups[groupKey] = {
@@ -347,7 +337,7 @@ export default function PedestrianCounterPage() {
         // Populate with actual data
         videoEntries.forEach((entry) => {
           const intervalStart = Math.floor(entry.timestamp / intervalSize) * intervalSize
-          const groupKey = `${entry.videoIndex}-${intervalStart}` // Use entry.videoIndex for groupKey
+          const groupKey = `${entry.videoIndex}-${intervalStart}`
 
           const direction = directions.find((d) => d.key === entry.key)
           if (direction && groups[groupKey]) {
@@ -762,7 +752,7 @@ export default function PedestrianCounterPage() {
       <input
         type="file"
         id="video-upload-hidden"
-        accept="video/mp4, video/webm, video/ogg, video/avi"
+        accept="video/mp4, video/webm, video/ogg"
         style={{ display: "none" }}
         onChange={(e) => {
           const file = (e.target as HTMLInputElement).files?.[0]
@@ -770,6 +760,8 @@ export default function PedestrianCounterPage() {
             const url = URL.createObjectURL(file)
             handleVideoSelect(url)
           }
+          // Reset the input value
+          e.target.value = ""
         }}
       />
     </>

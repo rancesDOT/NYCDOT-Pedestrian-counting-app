@@ -311,7 +311,7 @@ export default function VideoRestorePrompt({ isOpen, onVideoRestore, onDismiss, 
                   </Button>
 
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-6">
-                    Supports MP4, WebM, Ogg, AVI • Max 2GB
+                    Supports MP4, WebM, OGG, AVI • AVI files auto-convert to MP4 • Max 2GB
                   </p>
                 </div>
 
