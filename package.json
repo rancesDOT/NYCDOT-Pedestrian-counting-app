@@ -18,6 +18,8 @@
     "@radix-ui/react-slot": "^1.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "date-fns": "latest",
+    "file-saver": "latest",
     "lucide-react": "^0.454.0",
     "next": "14.2.16",
     "react": "^18",

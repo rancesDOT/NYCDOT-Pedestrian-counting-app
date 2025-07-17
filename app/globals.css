@@ -13,7 +13,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 221.2 83.2% 53.9%;
+    --primary: 221.2 83.2% 53.3%;
     --primary-foreground: 210 20% 98%;
 
     --secondary: 210 40% 96.1%;
@@ -28,9 +28,9 @@
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 20% 98%;
 
-    --border: 214.3 31.6% 91.4%;
-    --input: 214.3 31.6% 91.4%;
-    --ring: 221.2 83.2% 53.9%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
 
     --radius: 0.5rem;
   }
@@ -52,7 +52,7 @@
     --secondary-foreground: 210 20% 98%;
 
     --muted: 217.2 32.4% 91.2%;
-    --muted-foreground: 215.4 16.3% 56.9%;
+    --muted-foreground: 215 20.2% 65.1%;
 
     --accent: 217.2 32.4% 91.2%;
     --accent-foreground: 210 20% 98%;
@@ -75,70 +75,15 @@
   }
 }
 
-/* Prevent layout shifts from hidden inputs */
-input[type="file"].hidden,
-input.hidden {
-  position: absolute !important;
-  left: -9999px !important;
-  width: 1px !important;
-  height: 1px !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-  overflow: hidden !important;
-  clip: rect(0, 0, 0, 0) !important;
-  white-space: nowrap !important;
-  border: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-/* Prevent focus outline on hidden inputs */
-input[type="file"].hidden:focus,
-input.hidden:focus {
-  outline: none !important;
-  box-shadow: none !important;
-}
-
-/* Ensure stable layout for main container */
-main {
-  contain: layout style;
-}
-
-/* Prevent unwanted text selection during key presses */
-.no-select {
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
-}
-
-/* Stable video container */
-.video-container {
-  contain: layout;
-  will-change: auto;
-}
-
-/* Global Animations */
-@keyframes breatheGlowContinuous {
+@keyframes pulseGlow {
   0% {
-    opacity: 0.4;
+    box-shadow: 0 0 0px rgba(59, 130, 246, 0);
   }
   50% {
-    opacity: 0.8;
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.7);
   }
   100% {
-    opacity: 0.4;
-  }
-}
-
-@keyframes slideInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+    box-shadow: 0 0 0px rgba(59, 130, 246, 0);
   }
 }
 
@@ -153,26 +98,13 @@ main {
   }
 }
 
-@keyframes fadeIn {
+@keyframes slideInUp {
   from {
     opacity: 0;
+    transform: translateY(20px);
   }
   to {
     opacity: 1;
+    transform: translateY(0);
   }
-}
-
-@keyframes pulseGlow {
-  0%,
-  100% {
-    box-shadow: 0 0 5px rgba(59, 130, 246, 0.3);
-  }
-  50% {
-    box-shadow: 0 0 20px rgba(59, 130, 246, 0.6), 0 0 30px rgba(59, 130, 246, 0.4);
-  }
-}
-
-/* Add after existing styles */
-.pr-84 {
-  padding-right: 21rem; /* 336px - width of expanded sidebar (80) + some margin */
 }

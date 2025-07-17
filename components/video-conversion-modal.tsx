@@ -1,386 +1,302 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
+import { useState, useEffect, useRef, useCallback } from "react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Progress } from "@/components/ui/progress"
-import { AlertTriangle, CheckCircle, Download, FileVideo, Loader2, Info } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Loader2, CheckCircle, XCircle, Info, Download, Upload, Video } from "lucide-react"
+import { FFmpeg } from "@ffmpeg/ffmpeg"
+import { toBlobURL } from "@ffmpeg/util"
 
 interface VideoConversionModalProps {
   isOpen: boolean
   onClose: () => void
+  videoFile: File | null
   onConversionComplete: (convertedFile: File) => void
-  aviFile: File | null
 }
-
-// Define potential CDN base URLs for FFmpeg.wasm
-const FFMPEG_BASE_URLS = [
-  "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd",
-  "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd",
-]
 
 export default function VideoConversionModal({
   isOpen,
   onClose,
+  videoFile,
   onConversionComplete,
-  aviFile,
 }: VideoConversionModalProps) {
-  const [ffmpeg, setFFmpeg] = useState<any>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [isConverting, setIsConverting] = useState(false)
+  const ffmpegRef = useRef<FFmpeg | null>(null)
+  const [ready, setReady] = useState(false)
   const [progress, setProgress] = useState(0)
-  const [status, setStatus] = useState("Ready to convert")
+  const [status, setStatus] = useState("Initializing...")
   const [error, setError] = useState<string | null>(null)
-  const [convertedBlob, setConvertedBlob] = useState<Blob | null>(null)
-  const [isFFmpegLoaded, setIsFFmpegLoaded] = useState(false)
-  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const [convertedBlobUrl, setConvertedBlobUrl] = useState<string | null>(null)
 
-  // Load FFmpeg when modal opens
-  useEffect(() => {
-    if (isOpen && !ffmpeg && !isLoading && !isFFmpegLoaded) {
-      loadFFmpeg()
+  const loadFFmpeg = useCallback(async () => {
+    if (ffmpegRef.current) {
+      setReady(true)
+      return
     }
-  }, [isOpen, ffmpeg, isLoading, isFFmpegLoaded])
 
-  const loadFFmpeg = async () => {
-    setIsLoading(true)
-    setStatus("Loading video converter...")
+    setStatus("Loading FFmpeg...")
     setError(null)
+    setProgress(0)
 
     try {
-      const { FFmpeg } = await import("@ffmpeg/ffmpeg")
-      const { toBlobURL } = await import("@ffmpeg/util")
-
-      let loadedSuccessfully = false
-      for (const baseURL of FFMPEG_BASE_URLS) {
+      const baseURLs = [
+        "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd",
+        "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd",
+      ]
+      let loaded = false
+      for (const baseURL of baseURLs) {
         try {
-          const ffmpegInstance = new FFmpeg()
-
-          ffmpegInstance.on("progress", ({ progress }) => {
-            if (progress > 0 && progress <= 1) {
-              setProgress(Math.round(progress * 100))
-            }
+          const ffmpeg = new FFmpeg()
+          ffmpeg.on("log", ({ message }) => {
+            console.log("[FFmpeg log]", message)
+            setStatus(message)
+          })
+          ffmpeg.on("progress", ({ progress: p, time }) => {
+            setProgress(Math.round(p * 100))
+            setStatus(`Converting: ${Math.round(p * 100)}%`)
           })
 
-          await ffmpegInstance.load({
+          await ffmpeg.load({
             coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
             wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+            workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, "text/javascript"),
           })
-
-          setFFmpeg(ffmpegInstance)
-          setIsFFmpegLoaded(true)
-          setStatus("Video converter loaded successfully!")
-          loadedSuccessfully = true
-          break // Exit loop if loaded successfully
-        } catch (cdnError) {
-          console.warn(`Failed to load FFmpeg from ${baseURL}:`, cdnError)
-          // Continue to next CDN
+          ffmpegRef.current = ffmpeg
+          setReady(true)
+          setStatus("FFmpeg loaded. Ready to convert.")
+          loaded = true
+          break
+        } catch (e) {
+          console.warn(`Failed to load FFmpeg from ${baseURL}:`, e)
+          if (e instanceof DOMException && e.name === "SecurityError") {
+            setError(
+              "FFmpeg could not be loaded due to browser security restrictions (CORS/Worker issues). " +
+                "Please try converting your video using an external tool like VLC or HandBrake, then upload the MP4 file.",
+            )
+            break // Stop trying other URLs if it's a security error
+          }
+          setError(`Failed to load FFmpeg from ${baseURL}. Trying next URL...`)
         }
       }
-
-      if (!loadedSuccessfully) {
-        throw new Error("All FFmpeg CDN sources failed to load.")
+      if (!loaded) {
+        setError(
+          "Failed to load FFmpeg from all available sources. " +
+            "This might be due to network issues or browser restrictions. " +
+            "Please try converting your video using an external tool like VLC or HandBrake, then upload the MP4 file.",
+        )
       }
-    } catch (err: any) {
-      console.error("Failed to load FFmpeg:", err)
-      let errorMessage = "Failed to load video converter. Please try refreshing the page."
-      if (err.message && (err.message.includes("Failed to construct 'Worker'") || err.message.includes("CORS"))) {
-        errorMessage =
-          "Failed to load video converter due to browser security restrictions (CORS). Please try converting your AVI file to MP4 using a desktop application like VLC or HandBrake, then upload the MP4 file."
-      }
-      setError(errorMessage)
-      setStatus("Error loading converter")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const convertAviToMp4 = async () => {
-    if (!ffmpeg || !aviFile) return
-
-    try {
-      setIsConverting(true)
-      setProgress(0)
-      setStatus("Preparing conversion...")
-      setError(null)
-
-      const { fetchFile } = await import("@ffmpeg/util")
-
-      setStatus("Reading input file...")
-      await ffmpeg.writeFile("input.avi", await fetchFile(aviFile))
-
-      setStatus("Converting AVI to MP4...")
-
-      // Start progress simulation if FFmpeg progress is not granular enough
-      progressIntervalRef.current = setInterval(() => {
-        setProgress((prev) => {
-          if (prev < 90) return prev + 2 // Simulate progress up to 90%
-          return prev
-        })
-      }, 200)
-
-      // Convert with optimized settings for web playback
-      await ffmpeg.exec([
-        "-i",
-        "input.avi",
-        "-c:v",
-        "libx264", // Use H.264 codec
-        "-preset",
-        "fast", // Faster encoding
-        "-crf",
-        "23", // Good quality/size balance
-        "-c:a",
-        "aac", // AAC audio codec
-        "-movflags",
-        "+faststart", // Optimize for web streaming
-        "output.mp4",
-      ])
-
-      // Clear progress interval
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current)
-        progressIntervalRef.current = null
-      }
-
-      setProgress(100)
-      setStatus("Reading converted file...")
-
-      const data = await ffmpeg.readFile("output.mp4")
-      const blob = new Blob([data], { type: "video/mp4" })
-      setConvertedBlob(blob)
-
-      setStatus("Conversion complete!")
-
-      // Clean up FFmpeg filesystem
-      try {
-        await ffmpeg.deleteFile("input.avi")
-        await ffmpeg.deleteFile("output.mp4")
-      } catch (cleanupError) {
-        console.warn("FFmpeg cleanup warning:", cleanupError)
-      }
-    } catch (err) {
-      console.error("Conversion failed:", err)
-      setError("Conversion failed. Please try again or use a different file.")
-      setStatus("Conversion failed")
-
-      // Clear progress interval on error
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current)
-        progressIntervalRef.current = null
-      }
-    } finally {
-      setIsConverting(false)
-    }
-  }
-
-  const handleUseConverted = () => {
-    if (convertedBlob && aviFile) {
-      const convertedFile = new File([convertedBlob], aviFile.name.replace(/\.avi$/i, ".mp4"), {
-        type: "video/mp4",
-      })
-      onConversionComplete(convertedFile)
-      onClose()
-    }
-  }
-
-  const handleDownload = () => {
-    if (convertedBlob && aviFile) {
-      const url = URL.createObjectURL(convertedBlob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = aviFile.name.replace(/\.avi$/i, ".mp4")
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-    }
-  }
-
-  const handleClose = () => {
-    if (progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current)
-      progressIntervalRef.current = null
-    }
-    onClose()
-  }
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current)
-      }
+    } catch (e) {
+      console.error("Error loading FFmpeg:", e)
+      setError(
+        "An unexpected error occurred while loading FFmpeg. " +
+          "Please try converting your video using an external tool like VLC or HandBrake, then upload the MP4 file.",
+      )
     }
   }, [])
 
+  useEffect(() => {
+    if (isOpen && !ready && !error) {
+      loadFFmpeg()
+    }
+  }, [isOpen, ready, error, loadFFmpeg])
+
+  const convertToMp4 = useCallback(async () => {
+    if (!ffmpegRef.current || !videoFile) {
+      setError("FFmpeg not ready or no file selected.")
+      return
+    }
+
+    setStatus("Converting...")
+    setProgress(0)
+    setError(null)
+    setConvertedBlobUrl(null)
+
+    try {
+      const ffmpeg = ffmpegRef.current
+      await ffmpeg.writeFile("input.avi", new Uint8Array(await videoFile.arrayBuffer()))
+      await ffmpeg.exec(["-i", "input.avi", "output.mp4"])
+      const data = (await ffmpeg.readFile("output.mp4")) as Uint8Array
+
+      const blob = new Blob([data.buffer], { type: "video/mp4" })
+      const url = URL.createObjectURL(blob)
+      setConvertedBlobUrl(url)
+      setStatus("Conversion complete!")
+      setProgress(100)
+    } catch (e) {
+      console.error("Error during conversion:", e)
+      setError(
+        `Conversion failed: ${e instanceof Error ? e.message : String(e)}. ` +
+          "Please ensure the AVI file is valid or try an external converter.",
+      )
+      setStatus("Conversion failed.")
+      setProgress(0)
+    } finally {
+      // Clean up file system
+      try {
+        if (ffmpegRef.current) {
+          await ffmpegRef.current.rm("input.avi")
+          await ffmpegRef.current.rm("output.mp4")
+        }
+      } catch (cleanupError) {
+        console.warn("Failed to clean up FFmpeg file system:", cleanupError)
+      }
+    }
+  }, [videoFile])
+
+  const handleUseConvertedVideo = useCallback(() => {
+    if (convertedBlobUrl && videoFile) {
+      // Create a new File object with the converted blob and original name (but .mp4 extension)
+      const convertedFile = new File([convertedBlobUrl], videoFile.name.replace(/\.avi$/i, ".mp4"), {
+        type: "video/mp4",
+      })
+      onConversionComplete(convertedFile)
+      setConvertedBlobUrl(null)
+      onClose()
+    }
+  }, [convertedBlobUrl, videoFile, onConversionComplete, onClose])
+
+  const handleDownloadConvertedVideo = useCallback(() => {
+    if (convertedBlobUrl && videoFile) {
+      const a = document.createElement("a")
+      a.href = convertedBlobUrl
+      a.download = videoFile.name.replace(/\.avi$/i, ".mp4")
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+    }
+  }, [convertedBlobUrl, videoFile])
+
+  const handleCloseModal = useCallback(() => {
+    setReady(false)
+    setProgress(0)
+    setStatus("Initializing...")
+    setError(null)
+    setConvertedBlobUrl(null)
+    onClose()
+  }, [onClose])
+
   if (!isOpen) return null
 
-  const showConversionControls = !error || (error && !error.includes("browser security restrictions"))
+  const CurrentIcon = error ? XCircle : convertedBlobUrl ? CheckCircle : Loader2
 
   return (
     <Dialog open={isOpen}>
       <DialogContent className="max-w-md mx-auto" hideCloseButton>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileVideo className="h-5 w-5 text-blue-600" />
+          <DialogTitle className="flex items-center justify-center gap-2 text-center">
+            <Video className="h-6 w-6 text-blue-600" />
             Convert AVI to MP4
           </DialogTitle>
+          <DialogDescription className="text-center">
+            Your video is in AVI format. It needs to be converted to MP4 for playback.
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
-          {/* File Info */}
-          {aviFile && (
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-              <div className="flex items-center gap-3">
-                <FileVideo className="h-8 w-8 text-gray-600 dark:text-gray-400" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-900 dark:text-white truncate">{aviFile.name}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {(aviFile.size / (1024 * 1024)).toFixed(1)} MB
-                  </p>
-                </div>
+        <div className="flex flex-col items-center p-6 space-y-6">
+          <div className="relative">
+            <div
+              className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-500 ease-out ${
+                error ? "bg-red-500" : convertedBlobUrl ? "bg-green-500" : "bg-blue-500 animate-pulse"
+              }`}
+            >
+              <CurrentIcon className="h-10 w-10 text-white transition-transform duration-300 ease-out" />
+            </div>
+          </div>
+
+          <div className="text-center space-y-2">
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-white">{status}</h3>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+          </div>
+
+          {!error && (
+            <div className="w-full space-y-2">
+              <Progress value={progress} className="h-2" />
+              <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                <span>{progress}%</span>
+                <span>{progress < 100 ? "Processing..." : "Complete!"}</span>
               </div>
             </div>
           )}
 
-          {/* Status */}
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              {isLoading || isConverting ? (
-                <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-              ) : error ? (
-                <AlertTriangle className="h-5 w-5 text-red-600" />
-              ) : convertedBlob ? (
-                <CheckCircle className="h-5 w-5 text-green-600" />
-              ) : (
-                <FileVideo className="h-5 w-5 text-gray-600" />
-              )}
-              <span
-                className={`font-medium ${
-                  error
-                    ? "text-red-600"
-                    : convertedBlob
-                      ? "text-green-600"
-                      : isLoading || isConverting
-                        ? "text-blue-600"
-                        : "text-gray-600"
-                }`}
-              >
-                {status}
-              </span>
+          <div className="w-full bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600 dark:text-gray-300">Original File:</span>
+              <span className="font-medium text-gray-800 dark:text-white">{videoFile?.name || "N/A"}</span>
             </div>
-
-            {/* Progress Bar */}
-            {(isLoading || isConverting) && (
-              <div className="space-y-2">
-                <Progress value={progress} className="h-2" />
-                <p className="text-xs text-gray-500">{progress}%</p>
-              </div>
-            )}
-
-            {/* Error Message */}
-            {error && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 mt-4">
-                <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
-                {error.includes("browser security restrictions") && (
-                  <div className="mt-3 text-xs text-red-600 dark:text-red-400 space-y-2">
-                    <p>You can convert your AVI file to MP4 using a desktop application:</p>
-                    <ul className="list-disc list-inside">
-                      <li>
-                        <a
-                          href="https://www.videolan.org/vlc/"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="underline"
-                        >
-                          VLC Media Player
-                        </a>{" "}
-                        (Free, open-source)
-                      </li>
-                      <li>
-                        <a href="https://handbrake.fr/" target="_blank" rel="noopener noreferrer" className="underline">
-                          HandBrake
-                        </a>{" "}
-                        (Free, open-source)
-                      </li>
-                    </ul>
-                    <p>Once converted, upload the MP4 file directly to the app.</p>
-                  </div>
-                )}
-              </div>
-            )}
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600 dark:text-gray-300">Target Format:</span>
+              <span className="font-medium text-gray-800 dark:text-white">MP4</span>
+            </div>
           </div>
 
-          {/* Info Box */}
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-            <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-2 text-sm flex items-center gap-1">
-              <Info className="h-4 w-4" /> About AVI Conversion
-            </h4>
-            <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
-              <li>• Converts AVI files to web-compatible MP4 format</li>
-              <li>• Uses H.264 video codec for best browser support</li>
-              <li>• Processing happens entirely in your browser</li>
-              <li>• Large files may take several minutes to convert</li>
-              <li>• Converted file can be downloaded for future use</li>
-            </ul>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-3">
-            {!convertedBlob && showConversionControls ? (
-              <>
+          {error ? (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 text-sm text-yellow-700 dark:text-yellow-300 space-y-2">
+              <h4 className="font-semibold flex items-center gap-2">
+                <Info className="h-4 w-4" />
+                External Conversion Recommended
+              </h4>
+              <p>If in-browser conversion fails, you can use free external tools to convert your AVI to MP4:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>
+                  <a
+                    href="https://www.videolan.org/vlc/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline text-blue-600 hover:text-blue-800"
+                  >
+                    VLC Media Player
+                  </a>{" "}
+                  (File &gt; Convert/Stream)
+                </li>
+                <li>
+                  <a
+                    href="https://handbrake.fr/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline text-blue-600 hover:text-blue-800"
+                  >
+                    HandBrake
+                  </a>{" "}
+                  (Open Source Video Transcoder)
+                </li>
+              </ul>
+              <p>After converting, upload the new MP4 file directly.</p>
+            </div>
+          ) : (
+            <div className="flex gap-3 w-full">
+              {!convertedBlobUrl ? (
                 <Button
-                  onClick={convertAviToMp4}
-                  disabled={!isFFmpegLoaded || isLoading || isConverting}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  onClick={convertToMp4}
+                  disabled={!ready || !videoFile || progress > 0}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
                 >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Loading...
-                    </>
-                  ) : isConverting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Converting...
-                    </>
-                  ) : (
-                    "Convert to MP4"
-                  )}
+                  <Video className="h-5 w-5 mr-2" />
+                  Convert Video
                 </Button>
-                <Button variant="outline" onClick={handleClose} className="bg-transparent">
-                  Cancel
-                </Button>
-              </>
-            ) : (
-              <>
-                {convertedBlob && (
-                  <Button onClick={handleUseConverted} className="flex-1 bg-green-600 hover:bg-green-700">
-                    Use Converted Video
+              ) : (
+                <>
+                  <Button
+                    onClick={handleUseConvertedVideo}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <Upload className="h-5 w-5 mr-2" />
+                    Use Converted
                   </Button>
-                )}
-                <Button variant="outline" onClick={handleDownload} className="bg-transparent" disabled={!convertedBlob}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Download
-                </Button>
-                {!convertedBlob && !showConversionControls && (
-                  <Button onClick={handleClose} className="flex-1">
-                    Close
+                  <Button
+                    onClick={handleDownloadConvertedVideo}
+                    variant="outline"
+                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800"
+                  >
+                    <Download className="h-5 w-5 mr-2" />
+                    Download MP4
                   </Button>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Performance Warning */}
-          {aviFile && aviFile.size > 100 * 1024 * 1024 && (
-            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-              <p className="text-xs text-amber-700 dark:text-amber-300">
-                <strong>Large File Warning:</strong> Files over 100MB may take a long time to convert and could cause
-                browser performance issues. Consider using a desktop converter for very large files.
-              </p>
+                </>
+              )}
             </div>
           )}
+          <Button onClick={handleCloseModal} variant="ghost" className="w-full">
+            {error ? "Close" : "Cancel"}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

@@ -6,6 +6,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Upload, Clock, Users, MapPin, X, FileVideo, Keyboard } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { History, PlayCircle, Trash2 } from "lucide-react"
 
 interface VideoRestorePromptProps {
   isOpen: boolean
@@ -18,9 +20,18 @@ interface VideoRestorePromptProps {
     intersectionCount: number
     lastSaved: number
   }
+  onConfirmRestore: () => void
+  hasPreviousData: boolean
 }
 
-export default function VideoRestorePrompt({ isOpen, onVideoRestore, onDismiss, savedData }: VideoRestorePromptProps) {
+export default function VideoRestorePrompt({
+  isOpen,
+  onVideoRestore,
+  onDismiss,
+  savedData,
+  onConfirmRestore,
+  hasPreviousData,
+}: VideoRestorePromptProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [dragCounter, setDragCounter] = useState(0)
 
@@ -181,6 +192,43 @@ export default function VideoRestorePrompt({ isOpen, onVideoRestore, onDismiss, 
         onClick={onDismiss}
         aria-hidden="true"
       />
+
+      <Dialog open={isOpen}>
+        <DialogContent className="max-w-md mx-auto" hideCloseButton>
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-center gap-2 text-center">
+              <History className="h-6 w-6 text-blue-500" />
+              Restore Previous Session?
+            </DialogTitle>
+            <DialogDescription className="text-center">
+              It looks like you have unsaved pedestrian counting data from a previous session.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-4">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 text-center">
+              <p className="text-sm text-yellow-700">
+                If you proceed without restoring, your previous counts will be lost.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <Button
+                onClick={onConfirmRestore}
+                disabled={!hasPreviousData}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <PlayCircle className="h-5 w-5 mr-2" />
+                Restore Session
+              </Button>
+              <Button onClick={onDismiss} variant="outline" className="w-full bg-red-500 hover:bg-red-600 text-white">
+                <Trash2 className="h-5 w-5 mr-2" />
+                Start New Session (Discard Data)
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div
         className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -347,14 +395,6 @@ export default function VideoRestorePrompt({ isOpen, onVideoRestore, onDismiss, 
                   <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs font-mono">Esc</kbd>
                   <span>Close</span>
                 </div>
-
-                <Button
-                  variant="outline"
-                  onClick={onDismiss}
-                  className="text-sm hover:bg-gray-50 dark:hover:bg-gray-800 focus:ring-2 focus:ring-blue-500 bg-transparent"
-                >
-                  Start New Session
-                </Button>
               </div>
             </div>
           </CardContent>

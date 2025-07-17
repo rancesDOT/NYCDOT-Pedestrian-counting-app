@@ -1,367 +1,223 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useCallback } from "react"
-import { Button } from "@/components/ui/button"
-import { MapPin, Check, RotateCcw } from "lucide-react"
 
-interface Intersection {
-  id: string
-  x: number
-  y: number
-  label: string
-  color: string
-}
+import { useState, useEffect, useRef, useCallback } from "react"
+import { Button } from "@/components/ui/button"
+import { Check, X, GripVertical, Trash2 } from "lucide-react"
 
 interface VideoOverlayProps {
   videoRef: React.RefObject<HTMLVideoElement>
-  isVideoLoaded: boolean
-  lastPressed: { key: string; direction: string } | null
-  onIntersectionsSet: (intersections: Intersection[]) => void
+  onIntersectionsSet: (intersections: IntersectionPoint[]) => void
+  onCancelLabeling: () => void
+  isLabelingMode: boolean
+  initialIntersections?: IntersectionPoint[]
 }
 
-const intersectionConfig = [
-  { label: "North Intersection", color: "#3b82f6", bgColor: "bg-blue-500", textColor: "text-blue-600" },
-  { label: "East Intersection", color: "#10b981", bgColor: "bg-emerald-500", textColor: "text-emerald-600" },
-  { label: "South Intersection", color: "#ef4444", bgColor: "bg-red-500", textColor: "text-red-600" },
-  { label: "West Intersection", color: "#f59e0b", bgColor: "bg-amber-500", textColor: "text-amber-600" },
-]
+export interface IntersectionPoint {
+  id: string
+  x: number
+  y: number
+  direction: "North" | "East" | "South" | "West" | null
+}
 
-export default function VideoOverlay({ videoRef, isVideoLoaded, lastPressed, onIntersectionsSet }: VideoOverlayProps) {
-  const [intersections, setIntersections] = useState<Intersection[]>([])
-  const [isLabeling, setIsLabeling] = useState(false)
-  const [labelingStep, setLabelingStep] = useState(0)
-  const [showFinalConfirmation, setShowFinalConfirmation] = useState(false)
-  const [redoingIndex, setRedoingIndex] = useState<number | null>(null)
-  const [hoveredIntersection, setHoveredIntersection] = useState<string | null>(null)
-  const [activeAnimation, setActiveAnimation] = useState<string | null>(null)
-  const [animationTimeouts, setAnimationTimeouts] = useState<Map<string, NodeJS.Timeout>>(new Map())
+const INTERSECTION_COLORS: { [key: string]: string } = {
+  North: "bg-blue-500",
+  East: "bg-emerald-500",
+  South: "bg-red-500",
+  West: "bg-amber-500",
+}
+
+export default function VideoOverlay({
+  videoRef,
+  onIntersectionsSet,
+  onCancelLabeling,
+  isLabelingMode,
+  initialIntersections = [],
+}: VideoOverlayProps) {
+  const [intersections, setIntersections] = useState<IntersectionPoint[]>(initialIntersections)
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [offset, setOffset] = useState({ x: 0, y: 0 })
+  const overlayRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (isVideoLoaded && intersections.length === 0 && !isLabeling && !showFinalConfirmation) {
-      const timer = setTimeout(startLabeling, 500)
-      return () => clearTimeout(timer)
-    }
-  }, [isVideoLoaded, intersections.length, isLabeling, showFinalConfirmation])
+    setIntersections(initialIntersections)
+  }, [initialIntersections])
 
-  const clearAnimationTimeout = useCallback((intersectionId: string) => {
-    setAnimationTimeouts((prev) => {
-      const newMap = new Map(prev)
-      const existingTimeout = newMap.get(intersectionId)
-      if (existingTimeout) {
-        clearTimeout(existingTimeout)
-        newMap.delete(intersectionId)
+  const getRelativeCoordinates = useCallback((clientX: number, clientY: number) => {
+    if (!overlayRef.current) return { x: 0, y: 0 }
+    const rect = overlayRef.current.getBoundingClientRect()
+    const x = (clientX - rect.left) / rect.width
+    const y = (clientY - rect.top) / rect.height
+    return { x, y }
+  }, [])
+
+  const handleOverlayClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (!isLabelingMode || draggingId) return
+
+      const { x, y } = getRelativeCoordinates(e.clientX, e.clientY)
+
+      if (intersections.length < 4) {
+        const newId = `point-${Date.now()}`
+        setIntersections((prev) => [...prev, { id: newId, x, y, direction: null }])
       }
-      return newMap
-    })
-  }, [])
+    },
+    [isLabelingMode, draggingId, intersections.length, getRelativeCoordinates],
+  )
 
-  const setAnimationTimeout = useCallback((intersectionId: string, timeout: NodeJS.Timeout) => {
-    setAnimationTimeouts((prev) => {
-      const newMap = new Map(prev)
-      newMap.set(intersectionId, timeout)
-      return newMap
-    })
-  }, [])
-
-  useEffect(() => {
-    if (lastPressed && intersections.length === 4) {
-      const intersection = getIntersectionForKey(lastPressed.key)
-      if (intersection) {
-        const intersectionId = intersection.id
-
-        clearAnimationTimeout(intersectionId)
-        setActiveAnimation(intersectionId)
-
-        const newTimeout = setTimeout(() => {
-          setActiveAnimation(null)
-          clearAnimationTimeout(intersectionId)
-        }, 4000)
-
-        setAnimationTimeout(intersectionId, newTimeout)
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent, id: string) => {
+      if (!isLabelingMode) return
+      e.stopPropagation()
+      const { clientX, clientY } = e
+      const point = intersections.find((p) => p.id === id)
+      if (point && overlayRef.current) {
+        const rect = overlayRef.current.getBoundingClientRect()
+        setOffset({
+          x: clientX - (point.x * rect.width + rect.left),
+          y: clientY - (point.y * rect.height + rect.top),
+        })
+        setDraggingId(id)
       }
-    }
-  }, [lastPressed, intersections.length, clearAnimationTimeout, setAnimationTimeout])
+    },
+    [isLabelingMode, intersections],
+  )
 
-  useEffect(() => {
-    return () => {
-      animationTimeouts.forEach((timeout) => clearTimeout(timeout))
-    }
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!draggingId || !isLabelingMode) return
+      const { x, y } = getRelativeCoordinates(e.clientX - offset.x, e.clientY - offset.y)
+      setIntersections((prev) =>
+        prev.map((p) =>
+          p.id === draggingId ? { ...p, x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) } : p,
+        ),
+      )
+    },
+    [draggingId, isLabelingMode, offset, getRelativeCoordinates],
+  )
+
+  const handleMouseUp = useCallback(() => {
+    setDraggingId(null)
   }, [])
 
-  const handleVideoClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isLabeling || !videoRef.current || showFinalConfirmation) return
-
-    const videoRect = videoRef.current.getBoundingClientRect()
-    const x = ((e.clientX - videoRect.left) / videoRect.width) * 100
-    const y = ((e.clientY - videoRect.top) / videoRect.height) * 100
-
-    const config = intersectionConfig[labelingStep]
-    const newIntersection: Intersection = {
-      id: `intersection-${labelingStep}`,
-      x,
-      y,
-      label: config.label,
-      color: config.color,
-    }
-
-    let updatedIntersections: Intersection[]
-
-    if (redoingIndex !== null) {
-      updatedIntersections = [...intersections]
-      updatedIntersections[redoingIndex] = newIntersection
-      setRedoingIndex(null)
-      setIsLabeling(false)
-      setShowFinalConfirmation(true)
+  useEffect(() => {
+    if (draggingId) {
+      window.addEventListener("mousemove", handleMouseMove)
+      window.addEventListener("mouseup", handleMouseUp)
     } else {
-      updatedIntersections = [...intersections, newIntersection]
-      if (labelingStep < 3) {
-        setLabelingStep(labelingStep + 1)
-      } else {
-        setIsLabeling(false)
-        setShowFinalConfirmation(true)
-      }
+      window.removeEventListener("mousemove", handleMouseMove)
+      window.removeEventListener("mouseup", handleMouseUp)
     }
-
-    setIntersections(updatedIntersections)
-  }
-
-  const handleIntersectionRedo = (index: number) => {
-    if (!showFinalConfirmation) return
-    setRedoingIndex(index)
-    setLabelingStep(index)
-    setIsLabeling(true)
-    setShowFinalConfirmation(false)
-  }
-
-  const confirmAllPoints = () => {
-    setShowFinalConfirmation(false)
-    setLabelingStep(0)
-    setRedoingIndex(null)
-    setActiveAnimation(null)
-    onIntersectionsSet(intersections)
-  }
-
-  const startLabeling = () => {
-    setIntersections([])
-    setIsLabeling(true)
-    setLabelingStep(0)
-    setShowFinalConfirmation(false)
-    setRedoingIndex(null)
-    setActiveAnimation(null)
-    onIntersectionsSet([])
-  }
-
-  const getIntersectionForKey = (key: string) => {
-    const keyToIntersectionIndex: Record<string, number> = {
-      "1": 0,
-      "2": 0,
-      "3": 2,
-      "4": 2,
-      "5": 1,
-      "6": 1,
-      "7": 3,
-      "8": 3,
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove)
+      window.removeEventListener("mouseup", handleMouseUp)
     }
-    const index = keyToIntersectionIndex[key]
-    return intersections[index]
-  }
+  }, [draggingId, handleMouseMove, handleMouseUp])
 
-  const currentConfig = intersectionConfig[labelingStep]
+  const assignDirection = useCallback((id: string, direction: IntersectionPoint["direction"]) => {
+    setIntersections((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, direction: p.direction === direction ? null : direction } : p)),
+    )
+  }, [])
+
+  const handleDelete = useCallback((id: string) => {
+    setIntersections((prev) => prev.filter((p) => p.id !== id))
+  }, [])
+
+  const handleConfirm = useCallback(() => {
+    const assignedIntersections = intersections.filter((p) => p.direction !== null)
+    if (assignedIntersections.length === 4) {
+      onIntersectionsSet(assignedIntersections)
+    } else {
+      alert("Please assign a unique direction (North, East, South, West) to all 4 points.")
+    }
+  }, [intersections, onIntersectionsSet])
+
+  const handleCancel = useCallback(() => {
+    setIntersections(initialIntersections) // Revert to initial state
+    onCancelLabeling()
+  }, [initialIntersections, onCancelLabeling])
+
+  const directionsAvailable = ["North", "East", "South", "West"] as const
+  const assignedDirections = new Set(intersections.map((p) => p.direction).filter(Boolean))
 
   return (
-    <div className="absolute inset-0 pointer-events-none z-10">
-      {isVideoLoaded && (
+    <div
+      ref={overlayRef}
+      className={`absolute inset-0 z-10 ${isLabelingMode ? "cursor-crosshair" : "pointer-events-none"}`}
+      onClick={handleOverlayClick}
+    >
+      {intersections.map((point) => (
         <div
-          className="absolute top-4 left-4 pointer-events-auto z-30"
-          onMouseEnter={() => setHoveredIntersection("label-button")}
-          onMouseLeave={() => setHoveredIntersection(null)}
+          key={point.id}
+          className="absolute -translate-x-1/2 -translate-y-1/2"
+          style={{ left: `${point.x * 100}%`, top: `${point.y * 100}%` }}
         >
-          <Button
-            data-label-intersections
-            onClick={startLabeling}
-            className={`bg-blue-600 hover:bg-blue-700 text-white shadow-lg transition-all duration-300 hover:shadow-xl ${
-              !isLabeling && !showFinalConfirmation && intersections.length === 4
-                ? hoveredIntersection === "label-button"
-                  ? "opacity-100 scale-100"
-                  : "opacity-0 scale-95"
-                : !isLabeling && !showFinalConfirmation
-                  ? "opacity-100 scale-100"
-                  : "opacity-0 scale-95 pointer-events-none"
-            }`}
-          >
-            <MapPin className="h-4 w-4 mr-2" />
-            Label Intersections
-          </Button>
-        </div>
-      )}
-
-      {isLabeling && !showFinalConfirmation && (
-        <div
-          className="absolute inset-0 cursor-crosshair pointer-events-auto bg-black/40 backdrop-blur-sm z-40 animate-in fade-in duration-300"
-          onClick={handleVideoClick}
-        >
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 animate-in slide-in-from-bottom-4 duration-500">
-            <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-2xl p-6 border border-white/20 max-w-sm">
-              <div className="flex items-center gap-3 mb-3">
-                <div className={`w-4 h-4 rounded-full ${currentConfig.bgColor} shadow-sm animate-pulse`} />
-                <h3 className="text-lg font-semibold text-gray-800">
-                  {redoingIndex !== null ? `Redo ${currentConfig.label}` : `Step ${labelingStep + 1} of 4`}
-                </h3>
-              </div>
-              <p className={`text-base font-medium ${currentConfig.textColor} mb-2`}>
-                Click to {redoingIndex !== null ? "replace" : "mark"}: {currentConfig.label}
-              </p>
-              <p className="text-sm text-gray-600">Click anywhere on the video to place the marker</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showFinalConfirmation && (
-        <div className="absolute inset-0 pointer-events-auto bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
-          <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-2xl border border-white/20 w-full max-w-md mx-auto animate-in slide-in-from-bottom-4 duration-500">
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <MapPin className="h-5 w-5 text-blue-600 flex-shrink-0" />
-                <h3 className="text-lg font-semibold text-gray-800">Review Intersection Points</h3>
-              </div>
-              <p className="text-sm text-gray-600 mb-6">
-                All 4 intersections have been marked. Click the redo button next to any point to adjust it, or confirm
-                to continue.
-              </p>
-
-              <div className="space-y-3 mb-6">
-                {intersections.map((intersection, index) => {
-                  const config = intersectionConfig[index]
-                  return (
-                    <div
-                      key={intersection.id}
-                      className="flex items-center justify-between p-3 rounded-lg border border-gray-200 bg-gray-50/50 animate-in slide-in-from-left duration-300"
-                      style={{ animationDelay: `${index * 100}ms` }}
-                    >
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className={`w-3 h-3 rounded-full ${config.bgColor} shadow-sm flex-shrink-0`} />
-                        <span className="font-medium text-gray-700 truncate">{intersection.label}</span>
-                      </div>
-                      <Button
-                        onClick={() => handleIntersectionRedo(index)}
-                        variant="outline"
-                        size="sm"
-                        className="flex items-center gap-2 flex-shrink-0 ml-3 h-8 px-3 hover:scale-105 transition-transform duration-200"
-                      >
-                        <RotateCcw className="h-3 w-3" />
-                        <span className="text-xs">Redo</span>
-                      </Button>
-                    </div>
-                  )
-                })}
-              </div>
-
-              <Button
-                onClick={confirmAllPoints}
-                className="w-full bg-green-600 hover:bg-green-700 text-white flex items-center justify-center gap-2 h-12 hover:scale-105 transition-all duration-200"
-              >
-                <Check className="h-4 w-4" />
-                Confirm All Points
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {intersections.map((intersection, index) => {
-        const config = intersectionConfig[index]
-        const isHovered = hoveredIntersection === intersection.id
-        const isLabelingMode = isLabeling || showFinalConfirmation
-        const isAnimating = activeAnimation === intersection.id
-
-        return (
           <div
-            key={intersection.id}
-            className={`absolute ${
-              isLabelingMode ? "pointer-events-none z-20" : "pointer-events-auto group cursor-pointer z-20"
-            }`}
-            style={{
-              left: `${intersection.x}%`,
-              top: `${intersection.y}%`,
-              animation: `fadeInScale 0.6s ease-out ${index * 150}ms both`,
-            }}
-            onMouseEnter={() => !isLabelingMode && setHoveredIntersection(intersection.id)}
-            onMouseLeave={() => !isLabelingMode && setHoveredIntersection(null)}
+            className={`relative w-8 h-8 rounded-full border-2 border-white shadow-lg flex items-center justify-center transition-colors duration-200 ${
+              point.direction ? INTERSECTION_COLORS[point.direction] : "bg-gray-400"
+            } ${isLabelingMode ? "cursor-grab active:cursor-grabbing" : ""}`}
+            onMouseDown={isLabelingMode ? (e) => handleMouseDown(e, point.id) : undefined}
           >
-            {isAnimating && (
-              <div
-                className="absolute w-12 h-12 rounded-full pointer-events-none"
-                style={{
-                  left: "50%",
-                  top: "50%",
-                  backgroundColor: config.color,
-                  transform: "translate(-50%, -50%)",
-                  animation: "breatheGlowContinuous 1.2s ease-in-out infinite",
-                  opacity: 0.6,
-                }}
-              />
+            {isLabelingMode && (
+              <GripVertical className="h-4 w-4 text-white absolute -top-5 left-1/2 -translate-x-1/2" />
             )}
-
-            <div
-              className="absolute w-8 h-8 rounded-full transition-all duration-300 ease-out"
-              style={{
-                left: "50%",
-                top: "50%",
-                transform: `translate(-50%, -50%) scale(${isHovered || isAnimating ? 1.25 : 1})`,
-                backgroundColor: config.color,
-                opacity: isHovered || isAnimating ? 0.5 : 0.3,
-              }}
-            />
-
-            <div
-              className="absolute w-4 h-4 rounded-full border-2 border-white shadow-lg transition-all duration-300 ease-out"
-              style={{
-                left: "50%",
-                top: "50%",
-                transform: `translate(-50%, -50%) scale(${isHovered || isAnimating ? 1.25 : 1})`,
-                backgroundColor: config.color,
-              }}
-            />
-
-            <div
-              className={`absolute top-6 left-1/2 transform -translate-x-1/2 pointer-events-none transition-all duration-300 ease-out ${
-                isLabelingMode || isHovered || isAnimating
-                  ? "opacity-100 translate-y-0 scale-100"
-                  : "opacity-0 translate-y-2 scale-95"
-              }`}
-            >
-              <div className="bg-black/90 text-white text-xs px-2 py-1 rounded-md whitespace-nowrap shadow-lg backdrop-blur-sm">
-                {intersection.label.split(" ")[0]}
-              </div>
-            </div>
+            {point.direction && <span className="text-white text-xs font-bold">{point.direction.charAt(0)}</span>}
+            {isLabelingMode && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute -right-8 top-1/2 -translate-y-1/2 h-6 w-6 text-red-500 hover:bg-red-100"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleDelete(point.id)
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
           </div>
-        )
-      })}
-
-      {intersections.length > 0 && intersections.length < 4 && !showFinalConfirmation && redoingIndex === null && (
-        <div
-          className="absolute bottom-4 left-4 pointer-events-none z-20"
-          style={{ animation: "slideInUp 0.5s ease-out" }}
-        >
-          <div className="bg-black/90 text-white px-4 py-3 rounded-lg shadow-xl backdrop-blur-sm border border-white/10">
-            <div className="text-sm font-medium mb-2">Progress: {intersections.length}/4 intersections marked</div>
-            <div className="flex gap-2">
-              {intersectionConfig.map((config, index) => (
-                <div
-                  key={index}
-                  className={`w-3 h-3 rounded-full border border-white/30 transition-all duration-500 ease-out ${
-                    index < intersections.length ? config.bgColor : "bg-gray-600"
+          {isLabelingMode && (
+            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 flex flex-wrap gap-1 p-1 bg-white dark:bg-gray-800 rounded-md shadow-md border border-gray-200 dark:border-gray-700">
+              {directionsAvailable.map((dir) => (
+                <Button
+                  key={dir}
+                  variant={point.direction === dir ? "default" : "outline"}
+                  size="sm"
+                  className={`h-7 text-xs ${point.direction === dir ? INTERSECTION_COLORS[dir] : ""} ${
+                    assignedDirections.has(dir) && point.direction !== dir ? "opacity-50 cursor-not-allowed" : ""
                   }`}
-                  style={{
-                    animationDelay: `${index * 100}ms`,
-                    transform: index < intersections.length ? "scale(1.1)" : "scale(1)",
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (!(assignedDirections.has(dir) && point.direction !== dir)) {
+                      assignDirection(point.id, dir)
+                    }
                   }}
-                />
+                  disabled={assignedDirections.has(dir) && point.direction !== dir}
+                >
+                  {dir.charAt(0)}
+                </Button>
               ))}
             </div>
-          </div>
+          )}
+        </div>
+      ))}
+
+      {isLabelingMode && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700">
+          <Button
+            onClick={handleConfirm}
+            disabled={intersections.filter((p) => p.direction !== null).length !== 4}
+            className="bg-green-500 hover:bg-green-600 text-white"
+          >
+            <Check className="h-5 w-5 mr-2" />
+            Confirm
+          </Button>
+          <Button onClick={handleCancel} variant="outline" className="bg-red-500 hover:bg-red-600 text-white">
+            <X className="h-5 w-5 mr-2" />
+            Cancel
+          </Button>
         </div>
       )}
     </div>
