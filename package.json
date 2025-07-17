@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@ffmpeg/ffmpeg": "latest",
-    "@ffmpeg/util": "^0.12.1",
+    "@ffmpeg/util": "latest",
     "@radix-ui/react-alert-dialog": "^1.0.5",
     "@radix-ui/react-dialog": "latest",
     "@radix-ui/react-label": "latest",

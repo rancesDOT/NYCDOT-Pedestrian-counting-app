@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { AlertTriangle, CheckCircle, Download, FileVideo, Loader2 } from "lucide-react"
+import { AlertTriangle, CheckCircle, Download, FileVideo, Loader2 } from 'lucide-react'
 
 interface VideoConversionModalProps {
   isOpen: boolean
@@ -42,20 +42,26 @@ export default function VideoConversionModal({
       setStatus("Loading FFmpeg...")
       setError(null)
 
-      // Dynamic import to avoid SSR issues
-      const { createFFmpeg, fetchFile } = await import("@ffmpeg/ffmpeg")
+      // Dynamic import to avoid SSR issues - Updated API
+      const { FFmpeg } = await import("@ffmpeg/ffmpeg")
+      const { fetchFile, toBlobURL } = await import("@ffmpeg/util")
 
-      const ffmpegInstance = createFFmpeg({
-        log: true,
-        corePath: "https://unpkg.com/@ffmpeg/core@0.12.6/dist/ffmpeg-core.js",
-        progress: ({ ratio }) => {
-          if (ratio > 0 && ratio <= 1) {
-            setProgress(Math.round(ratio * 100))
-          }
-        },
+      const ffmpegInstance = new FFmpeg()
+
+      // Set up progress handler
+      ffmpegInstance.on("progress", ({ progress }) => {
+        if (progress > 0 && progress <= 1) {
+          setProgress(Math.round(progress * 100))
+        }
       })
 
-      await ffmpegInstance.load()
+      // Load FFmpeg with CDN URLs
+      const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd"
+      await ffmpegInstance.load({
+        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+      })
+
       setFFmpeg(ffmpegInstance)
       setIsFFmpegLoaded(true)
       setStatus("FFmpeg loaded successfully!")
@@ -77,12 +83,12 @@ export default function VideoConversionModal({
       setStatus("Preparing conversion...")
       setError(null)
 
-      // Import fetchFile dynamically
-      const { fetchFile } = await import("@ffmpeg/ffmpeg")
+      // Import fetchFile dynamically - Updated API
+      const { fetchFile } = await import("@ffmpeg/util")
 
-      // Write input file
+      // Write input file - Updated API
       setStatus("Reading input file...")
-      ffmpeg.FS("writeFile", "input.avi", await fetchFile(aviFile))
+      await ffmpeg.writeFile("input.avi", await fetchFile(aviFile))
 
       setStatus("Converting AVI to MP4...")
 
@@ -94,8 +100,8 @@ export default function VideoConversionModal({
         })
       }, 200)
 
-      // Convert with optimized settings for web playback
-      await ffmpeg.run(
+      // Convert with optimized settings for web playback - Updated API
+      await ffmpeg.exec([
         "-i",
         "input.avi",
         "-c:v",
@@ -109,7 +115,7 @@ export default function VideoConversionModal({
         "-movflags",
         "+faststart", // Optimize for web streaming
         "output.mp4",
-      )
+      ])
 
       // Clear progress interval
       if (progressIntervalRef.current) {
@@ -120,17 +126,17 @@ export default function VideoConversionModal({
       setProgress(100)
       setStatus("Reading converted file...")
 
-      // Read the converted file
-      const data = ffmpeg.FS("readFile", "output.mp4")
-      const blob = new Blob([data.buffer], { type: "video/mp4" })
+      // Read the converted file - Updated API
+      const data = await ffmpeg.readFile("output.mp4")
+      const blob = new Blob([data], { type: "video/mp4" })
       setConvertedBlob(blob)
 
       setStatus("Conversion complete!")
 
-      // Clean up FFmpeg filesystem
+      // Clean up FFmpeg filesystem - Updated API
       try {
-        ffmpeg.FS("unlink", "input.avi")
-        ffmpeg.FS("unlink", "output.mp4")
+        await ffmpeg.deleteFile("input.avi")
+        await ffmpeg.deleteFile("output.mp4")
       } catch (cleanupError) {
         console.warn("Cleanup warning:", cleanupError)
       }
