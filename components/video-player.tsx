@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useImperativeHandle, useCallback } from "react"
+import React, { useState, useImperativeHandle, useCallback, useRef, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { UploadCloud, RotateCcw, AlertTriangle, Info } from "lucide-react"
@@ -36,8 +36,22 @@ const VideoPlayer = React.forwardRef<HTMLVideoElement, VideoPlayerProps>(
     const internalRef = React.useRef<HTMLVideoElement>(null)
     const [videoError, setVideoError] = useState<string | null>(null)
     const [showFormatInfo, setShowFormatInfo] = useState(false)
+    const playPromiseRef = useRef<Promise<void> | null>(null)
+    const isUnmountingRef = useRef(false)
 
     useImperativeHandle(ref, () => internalRef.current as HTMLVideoElement)
+
+    // Cleanup on unmount
+    useEffect(() => {
+      return () => {
+        isUnmountingRef.current = true
+        if (playPromiseRef.current) {
+          playPromiseRef.current.catch(() => {
+            // Ignore errors during cleanup
+          })
+        }
+      }
+    }, [])
 
     React.useEffect(() => {
       if (videoSrc) {
@@ -187,6 +201,30 @@ const VideoPlayer = React.forwardRef<HTMLVideoElement, VideoPlayerProps>(
       document.getElementById("video-upload-hidden")?.click()
     }, [])
 
+    // Safe video play handler
+    const handleVideoPlay = useCallback(() => {
+      if (isUnmountingRef.current) return
+      onPlay()
+    }, [onPlay])
+
+    // Safe video pause handler
+    const handleVideoPause = useCallback(() => {
+      if (isUnmountingRef.current) return
+      onPause()
+    }, [onPause])
+
+    // Safe time update handler
+    const handleVideoTimeUpdate = useCallback(() => {
+      if (isUnmountingRef.current) return
+      onTimeUpdate()
+    }, [onTimeUpdate])
+
+    // Safe metadata loaded handler
+    const handleVideoLoadedMetadata = useCallback(() => {
+      if (isUnmountingRef.current) return
+      onLoadedMetadata()
+    }, [onLoadedMetadata])
+
     return (
       <>
         <Card className="h-full w-full flex flex-col shadow-lg rounded-b-none rounded-t-lg relative">
@@ -313,13 +351,13 @@ const VideoPlayer = React.forwardRef<HTMLVideoElement, VideoPlayerProps>(
                     ref={internalRef}
                     src={videoSrc}
                     className="w-full h-full object-contain rounded-md"
-                    onPlay={onPlay}
-                    onPause={onPause}
+                    onPlay={handleVideoPlay}
+                    onPause={handleVideoPause}
                     onError={handleVideoError}
                     controls={false}
                     preload="metadata"
-                    onTimeUpdate={onTimeUpdate}
-                    onLoadedMetadata={onLoadedMetadata}
+                    onTimeUpdate={handleVideoTimeUpdate}
+                    onLoadedMetadata={handleVideoLoadedMetadata}
                   />
                   <VideoOverlay
                     videoRef={internalRef}

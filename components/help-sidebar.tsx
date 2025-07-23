@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, ChevronLeft, Undo2 } from "lucide-react"
+import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, Undo2 } from "lucide-react"
 
 interface HelpSidebarProps {
   isOpen: boolean
@@ -152,32 +152,32 @@ export default function HelpSidebar({
           isCollapsed ? "w-12" : "w-80"
         } animate-in slide-in-from-right duration-300`}
       >
+        {/* Side Arrow Button */}
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              if (isCollapsed) {
+                setIsCollapsed(false)
+              } else {
+                onClose()
+              }
+            }}
+            className="h-16 w-8 rounded-l-lg rounded-r-none bg-white dark:bg-gray-800 border border-r-0 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-lg transition-all duration-200"
+            title={isCollapsed ? "Expand sidebar" : "Close help"}
+          >
+            {isCollapsed ? (
+              <ChevronRight className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+            ) : (
+              <ChevronLeft className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+            )}
+          </Button>
+        </div>
+
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex-shrink-0">
-            {!isCollapsed && (
-              <div className="flex items-center gap-3">
-                <h2 className="text-lg font-bold text-gray-800 dark:text-white">Help & Shortcuts</h2>
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  if (isCollapsed) {
-                    setIsCollapsed(false)
-                  } else {
-                    onClose()
-                  }
-                }}
-                className="h-8 w-8 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-200"
-                title={isCollapsed ? "Expand sidebar" : "Close help"}
-              >
-                {isCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-              </Button>
-            </div>
-          </div>
+          
 
           {!isCollapsed && (
             <>

@@ -23,7 +23,7 @@ export default function ExportProgressModal({
 
   const steps = [
     { icon: FileText, label: "Processing data", description: "Analyzing pedestrian counts..." },
-    { icon: BarChart3, label: "Grouping by intervals", description: "Organizing into 15-second intervals..." },
+    { icon: BarChart3, label: "Grouping by intervals", description: "Organizing into 1-minute intervals..." },
     { icon: Download, label: "Generating CSV", description: "Creating export file..." },
     { icon: CheckCircle, label: "Complete", description: "Data exported successfully!" },
   ]

@@ -1,10 +1,12 @@
-import type { Metadata } from 'next'
-import './globals.css'
+import type React from "react"
+import type { Metadata } from "next"
+import Link from "next/link"
+import "./globals.css"
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
-  generator: 'v0.dev',
+  title: "Pedestrian Counting App",
+  description: "An app for counting pedestrians in videos",
+  generator: "v0.dev",
 }
 
 export default function RootLayout({
@@ -14,7 +16,28 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <header className="bg-gray-800 text-white p-4 flex justify-between items-center">
+          <Link href="/" className="text-xl font-bold">
+            Pedestrian Counter
+          </Link>
+          <nav>
+            <ul className="flex space-x-4">
+              <li>
+                <Link href="/" className="hover:underline">
+                  Home
+                </Link>
+              </li>
+              <li>
+                <Link href="/counter" className="hover:underline">
+                  Counter
+                </Link>
+              </li>
+            </ul>
+          </nav>
+        </header>
+        {children}
+      </body>
     </html>
   )
 }

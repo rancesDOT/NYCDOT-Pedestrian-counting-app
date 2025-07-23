@@ -9,6 +9,7 @@ import VideoRestorePrompt from "@/components/video-restore-prompt"
 import VideoTimeInputDialog from "@/components/video-time-input-dialog"
 import VideoEndPrompt from "@/components/video-end-prompt"
 import { directionsConfig as directions } from "@/lib/key-mappings"
+import ExportOptionsDialog from "@/components/export-options-dialog"
 
 interface Intersection {
   id: string
@@ -74,12 +75,15 @@ export default function PedestrianCounterPage() {
   const [showVideoEndPrompt, setShowVideoEndPrompt] = useState(false)
   const [videoCount, setVideoCount] = useState(1)
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0)
+  const [showExportOptions, setShowExportOptions] = useState(false)
+  const [isExportAndEnd, setIsExportAndEnd] = useState(false)
 
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const autoSaveIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const isMountedRef = useRef(true)
 
   const saveToStorage = useCallback(() => {
     try {
@@ -210,6 +214,7 @@ export default function PedestrianCounterPage() {
     autoSaveIntervalRef.current = setInterval(saveToStorage, AUTO_SAVE_INTERVAL)
 
     return () => {
+      isMountedRef.current = false
       if (autoSaveIntervalRef.current) {
         clearInterval(autoSaveIntervalRef.current)
       }
@@ -263,11 +268,11 @@ export default function PedestrianCounterPage() {
     }
   }, [videoSrc])
 
-  const groupDataBy15Seconds = useCallback(
+  const groupDataBy1Minute = useCallback(
     (logEntries: LogEntry[]): GroupedEntry[] => {
       if (logEntries.length === 0) return []
 
-      const intervalSize = 15
+      const intervalSize = 60 // Changed from 15 to 60 seconds
       const groups: Record<string, GroupedEntry> = {}
 
       // Group by video index first, then by time intervals
@@ -448,10 +453,26 @@ export default function PedestrianCounterPage() {
 
   const handleFinish = useCallback(() => {
     if (log.length === 0) return
-    const grouped = groupDataBy15Seconds(log)
+    const grouped = groupDataBy1Minute(log)
     setGroupedData(grouped)
+    setShowExportOptions(true)
+  }, [log, groupDataBy1Minute])
+
+  const handleExportPreview = useCallback(() => {
+    setShowExportOptions(false)
     setShowExportModal(true)
-  }, [log, groupDataBy15Seconds])
+    setIsExportAndEnd(false)
+  }, [])
+
+  const handleExportAndEnd = useCallback(() => {
+    setShowExportOptions(false)
+    setShowExportModal(true)
+    setIsExportAndEnd(true)
+  }, [])
+
+  const handleCancelExport = useCallback(() => {
+    setShowExportOptions(false)
+  }, [])
 
   const handleExportComplete = useCallback(() => {
     setShowExportModal(false)
@@ -468,30 +489,47 @@ export default function PedestrianCounterPage() {
       }
 
       downloadCSV(groupedData, filename)
+
+      if (isExportAndEnd) {
+        handleClearVideo()
+      }
     }
-  }, [groupedData, downloadCSV, recordingStartTime])
+  }, [groupedData, downloadCSV, recordingStartTime, isExportAndEnd, handleClearVideo])
 
   const togglePlay = useCallback(() => {
-    if (!videoRef.current) return
+    if (!videoRef.current || !isMountedRef.current) return
+
     try {
       if (videoRef.current.paused) {
-        videoRef.current.play()
+        const playPromise = videoRef.current.play()
+        if (playPromise !== undefined) {
+          playPromise.catch((error) => {
+            // Only log if it's not an AbortError and component is still mounted
+            if (error.name !== "AbortError" && isMountedRef.current) {
+              console.error("Error playing video:", error)
+            }
+          })
+        }
       } else {
         videoRef.current.pause()
       }
     } catch (error) {
-      console.error("Error toggling video playback:", error)
+      if (isMountedRef.current) {
+        console.error("Error toggling video playback:", error)
+      }
     }
   }, [])
 
   const changePlaybackRate = useCallback((rate: number) => {
-    if (!videoRef.current) return
+    if (!videoRef.current || !isMountedRef.current) return
     try {
       const newRate = Math.max(0.25, Math.min(4, rate))
       videoRef.current.playbackRate = newRate
       setPlaybackRate(newRate)
     } catch (error) {
-      console.error("Error changing playback rate:", error)
+      if (isMountedRef.current) {
+        console.error("Error changing playback rate:", error)
+      }
     }
   }, [])
 
@@ -717,6 +755,7 @@ export default function PedestrianCounterPage() {
         onReplay={handleReplayVideo}
         totalCounts={totalCounts}
         videoCount={videoCount}
+        isLastVideo={currentVideoIndex === videoCount - 1}
       />
 
       <ExportProgressModal
@@ -763,6 +802,14 @@ export default function PedestrianCounterPage() {
           // Reset the input value
           e.target.value = ""
         }}
+      />
+      <ExportOptionsDialog
+        isOpen={showExportOptions}
+        onPreview={handleExportPreview}
+        onExportAndEnd={handleExportAndEnd}
+        onCancel={handleCancelExport}
+        totalEntries={log.length}
+        groupedEntries={groupedData.length}
       />
     </>
   )
