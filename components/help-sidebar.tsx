@@ -13,6 +13,8 @@ interface HelpSidebarProps {
   canUndo?: boolean
 }
 
+// const [showIframe, setShowIframe] = useState(false);
+
 const keyboardShortcuts = [
   {
     keys: ["1"],
@@ -273,7 +275,7 @@ export default function HelpSidebar({
                     <li>• Use arrow keys ← → to adjust playback speed</li>
                     <li>• When video ends, you can upload another video to continue counting</li>
                     <li>• All data from multiple videos will be combined in the export</li>
-                    <li>• Supported formats: MP4, WebM, OGG</li>
+                    <li>• Supported formats: MP4, WebM, OGG,testing</li>
                   </ul>
                 </div>
               </div>

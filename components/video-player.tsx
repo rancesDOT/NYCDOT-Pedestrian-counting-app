@@ -367,53 +367,65 @@ const VideoPlayer = React.forwardRef<HTMLVideoElement, VideoPlayerProps>(
                   />
                 </div>
               ) : (
-                <div className="text-center text-muted-foreground p-8 select-none flex flex-col items-center justify-center w-full h-full">
-                  <UploadCloud className="h-16 w-16 text-slate-400 mb-4 transition-transform duration-300 hover:scale-110" />
-                  <p className="text-lg font-semibold mb-2 leading-tight">Drag & drop video here</p>
-                  <p className="text-sm mb-4 leading-tight">or click anywhere to select a file</p>
+                  <div
+                      className="text-center text-muted-foreground p-8 select-none flex flex-col items-center justify-center w-full h-full">
+                    <UploadCloud
+                        className="h-16 w-16 text-slate-400 mb-4 transition-transform duration-300 hover:scale-110"/>
+                    <p className="text-lg font-semibold mb-2 leading-tight">Drag & drop video here</p>
+                    <p className="text-sm mb-4 leading-tight">or click anywhere to select a file</p>
 
-                  <div className="bg-slate-100 dark:bg-slate-700 rounded-lg px-4 py-3 mb-4 max-w-sm">
-                    <p className="text-xs text-slate-600 dark:text-slate-300 mb-2">
-                      <strong>Supported formats:</strong>
-                    </p>
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-1 rounded text-xs font-medium">
-                        MP4 ✓
-                      </span>
-                      <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded text-xs font-medium">
-                        WebM ✓
-                      </span>
-                      <span className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-1 rounded text-xs font-medium">
-                        OGG ✓
-                      </span>
+                    <div className="bg-slate-100 dark:bg-slate-700 rounded-lg px-4 py-3 mb-4 max-w-sm relative">
+                      <p className="text-xs text-slate-600 dark:text-slate-300 mb-2">
+                        <strong>Supported formats:</strong>
+                      </p>
+                      <div className="flex flex-wrap gap-2 justify-center">
+    <span
+        className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-1 rounded text-xs font-medium">
+      MP4
+    </span>
+                        <span
+                            className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded text-xs font-medium">
+      WebM
+    </span>
+                        <span
+                            className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-1 rounded text-xs font-medium">
+      OGG
+    </span>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                        AVI files need to be converted first
+                      </p>
+                      <button
+                          onClick={() => window.open('https://avi-converter-dot.streamlit.app/', 'aviConverter', 'width=800,height=600')}
+                          className="mt-3 text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded shadow-sm transition-all"
+                      >
+                        Convert AVI files
+                      </button>
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                      AVI files need to be converted first
-                    </p>
-                  </div>
 
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
-                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
-                    <span>Click or drag to get started</span>
+
+                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                      <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+                      <span>Click or drag to get started</span>
+                    </div>
                   </div>
-                </div>
               )}
               <Input
-                id="video-upload-hidden"
-                type="file"
-                accept="video/mp4,video/webm,video/ogg"
-                onChange={handleFileInputChange}
-                className="hidden"
-                style={{
-                  position: "absolute",
-                  left: "-9999px",
-                  width: "1px",
-                  height: "1px",
-                  opacity: 0,
-                  pointerEvents: "none",
-                }}
-                tabIndex={-1}
-                aria-hidden="true"
+                  id="video-upload-hidden"
+                  type="file"
+                  accept="video/mp4,video/webm,video/ogg"
+                  onChange={handleFileInputChange}
+                  className="hidden"
+                  style={{
+                    position: "absolute",
+                    left: "-9999px",
+                    width: "1px",
+                    height: "1px",
+                    opacity: 0,
+                    pointerEvents: "none",
+                  }}
+                  tabIndex={-1}
+                  aria-hidden="true"
               />
             </div>
           </CardContent>

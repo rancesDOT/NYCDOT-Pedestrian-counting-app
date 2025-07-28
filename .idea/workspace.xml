@@ -5,7 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="dca79b88-2d77-4b4a-b490-5d3d3320664d" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/tsconfig.json" beforeDir="false" afterPath="$PROJECT_DIR$/tsconfig.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/help-sidebar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/help-sidebar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/video-player.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/video-player.tsx" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
