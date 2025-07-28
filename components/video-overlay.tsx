@@ -171,30 +171,6 @@ export default function VideoOverlay({ videoRef, isVideoLoaded, lastPressed, onI
 
   return (
     <div className="absolute inset-0 pointer-events-none z-10">
-      {isVideoLoaded && (
-        <div
-          className="absolute top-4 left-4 pointer-events-auto z-30"
-          onMouseEnter={() => setHoveredIntersection("label-button")}
-          onMouseLeave={() => setHoveredIntersection(null)}
-        >
-          <Button
-            data-label-intersections
-            onClick={startLabeling}
-            className={`bg-blue-600 hover:bg-blue-700 text-white shadow-lg transition-all duration-300 hover:shadow-xl ${
-              !isLabeling && !showFinalConfirmation && intersections.length === 4
-                ? hoveredIntersection === "label-button"
-                  ? "opacity-100 scale-100"
-                  : "opacity-0 scale-95"
-                : !isLabeling && !showFinalConfirmation
-                  ? "opacity-100 scale-100"
-                  : "opacity-0 scale-95 pointer-events-none"
-            }`}
-          >
-            <MapPin className="h-4 w-4 mr-2" />
-            Label Intersections
-          </Button>
-        </div>
-      )}
 
       {isLabeling && !showFinalConfirmation && (
         <div

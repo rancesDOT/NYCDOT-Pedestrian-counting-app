@@ -172,7 +172,7 @@ export default function HelpSidebar({
             {isCollapsed ? (
               <ChevronRight className="h-5 w-5 text-gray-600 dark:text-gray-300" />
             ) : (
-              <ChevronLeft className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+              <ChevronRight className="h-5 w-5 text-gray-600 dark:text-gray-300" />
             )}
           </Button>
         </div>
