@@ -1,28 +1,51 @@
-# Pedestrian counting app
+# NYCDOT Pedestrian Counting App
 
-*Automatically synced with your [v0.dev](https://v0.dev) deployments*
+A React/Tailwind + TypeScript web app for tracking pedestrian counts. Built for NYCDOT by Rances Colon.
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/rances-projects-ba594abf/v0-pedestrian-counting-app)
-## Overview
+## Getting Started
 
-This repository will stay in sync with your deployed chats on [v0.dev](https://v0.dev).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.dev](https://v0.dev).
+### Prerequisites
+
+- Node.js (v18+ recommended)
+- npm
+### Next.js Setup
+
+If you need to set up Next.js:
+Install Next.js and React dependencies:
+```bash
+npm install next react react-dom
+```
+## Project Installation
+
+Clone the repository and install dependencies:
+
+```bash
+git clone https://github.com/rancescolon/NYCDOT-Pedestrian-counting-app.git
+cd NYCDOT-Pedestrian-counting-app
+```
+### Run Local Development Server
+```bash
+npm install
+npm run dev
+```
+Open your browser and go to [http://localhost:3000](http://localhost:3000) to view the app.
+
 
 ## Deployment
 
-Your project is live at:
+This project is live at using Github Pages:
 
-**[https://vercel.com/rances-projects-ba594abf/v0-pedestrian-counting-app](https://vercel.com/rances-projects-ba594abf/v0-pedestrian-counting-app)**
+**[https://rancescolon.github.io/NYCDOT-Pedestrian-counting-app/](https://vercel.com/rances-projects-ba594abf/v0-pedestrian-counting-app)**
 
-## Build your app
+# Contributing
+1. Fork the repo
+2. Create a feature branch 
+3. Commit your changes
+4. Open a pull request
 
-Continue building your app on:
-
-**[https://v0.dev/chat/projects/LviImsN7tZF](https://v0.dev/chat/projects/LviImsN7tZF)**
-
-## How It Works
-
-1. Create and modify your project using [v0.dev](https://v0.dev)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+# Project Structure
+- app/ — Main app directory 
+  - globals.css — Global styles 
+  - layout.tsx — Root layout 
+  - page.tsx — Main page (to add new pages create new folder with new page.tsx [source](https://nextjs.org/docs/pages/building-your-application/routing/pages-and-layouts))
+  - counter/page.tsx — Counter feature
