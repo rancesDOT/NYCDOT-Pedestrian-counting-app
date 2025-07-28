@@ -1,6 +1,6 @@
 # NYCDOT Pedestrian Counting App
 
-A React/Tailwind + TypeScript web app for tracking pedestrian counts. Built for NYCDOT by Rances Colon.
+A React(Next.JS)/Tailwind + TypeScript web app for tracking pedestrian counts. Built for NYCDOT by Rances Colon.
 
 ## Getting Started
 
@@ -38,7 +38,7 @@ This project is live at using Github Pages:
 **[https://rancescolon.github.io/NYCDOT-Pedestrian-counting-app/](https://vercel.com/rances-projects-ba594abf/v0-pedestrian-counting-app)**
 
 # Contributing
-1. Fork the repo
+1. Fork the [repo](https://github.com/rancesDOT/NYCDOT-Pedestrian-counting-app)
 2. Create a feature branch 
 3. Commit your changes
 4. Open a pull request
