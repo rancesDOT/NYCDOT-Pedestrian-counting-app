@@ -124,13 +124,13 @@ importers:
         version: 18.0.0
       react-day-picker:
         specifier: latest
-        version: 9.8.0(react@18.0.0)
+        version: 9.8.1(react@18.0.0)
       react-dom:
         specifier: ^18
         version: 18.0.0(react@18.0.0)
       react-hook-form:
         specifier: latest
-        version: 7.60.0(react@18.0.0)
+        version: 7.61.1(react@18.0.0)
       react-resizable-panels:
         specifier: latest
         version: 3.0.3(react-dom@18.0.0(react@18.0.0))(react@18.0.0)
@@ -172,7 +172,7 @@ importers:
         specifier: ^8.5
         version: 8.5.0
       tailwindcss:
-        specifier: ^3.3.5
+        specifier: ^3.4.17
         version: 3.4.17
       typescript:
         specifier: ^5
@@ -2339,8 +2339,8 @@ packages:
   queue-microtask@1.2.3:
     resolution: {integrity: sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A==}
 
-  react-day-picker@9.8.0:
-    resolution: {integrity: sha512-E0yhhg7R+pdgbl/2toTb0xBhsEAtmAx1l7qjIWYfcxOy8w4rTSVfbtBoSzVVhPwKP/5E9iL38LivzoE3AQDhCQ==}
+  react-day-picker@9.8.1:
+    resolution: {integrity: sha512-kMcLrp3PfN/asVJayVv82IjF3iLOOxuH5TNFWezX6lS/T8iVRFPTETpHl3TUSTH99IDMZLubdNPJr++rQctkEw==}
     engines: {node: '>=18'}
     peerDependencies:
       react: '>=16.8.0'
@@ -2350,8 +2350,8 @@ packages:
     peerDependencies:
       react: ^18.0.0
 
-  react-hook-form@7.60.0:
-    resolution: {integrity: sha512-SBrYOvMbDB7cV8ZfNpaiLcgjH/a1c7aK0lK+aNigpf4xWLO8q+o4tcvVurv3c4EOyzn/3dCsYt4GKD42VvJ/+A==}
+  react-hook-form@7.61.1:
+    resolution: {integrity: sha512-2vbXUFDYgqEgM2RcXcAT2PwDW/80QARi+PKmHy5q2KhuKvOlG8iIYgf7eIlIANR5trW9fJbP4r5aub3a4egsew==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
       react: ^16.8.0 || ^17 || ^18 || ^19
@@ -5144,7 +5144,7 @@ snapshots:
 
   queue-microtask@1.2.3: {}
 
-  react-day-picker@9.8.0(react@18.0.0):
+  react-day-picker@9.8.1(react@18.0.0):
     dependencies:
       '@date-fns/tz': 1.2.0
       date-fns: 4.1.0
@@ -5157,7 +5157,7 @@ snapshots:
       react: 18.0.0
       scheduler: 0.21.0
 
-  react-hook-form@7.60.0(react@18.0.0):
+  react-hook-form@7.61.1(react@18.0.0):
     dependencies:
       react: 18.0.0
 
