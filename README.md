@@ -35,7 +35,7 @@ Open your browser and go to [http://localhost:3000](http://localhost:3000) to vi
 
 This project is live at using Github Pages:
 
-**[https://rancescolon.github.io/NYCDOT-Pedestrian-counting-app/](https://vercel.com/rances-projects-ba594abf/v0-pedestrian-counting-app)**
+https://rancesdot.github.io/NYCDOT-Pedestrian-counting-app/
 
 # Contributing
 1. Fork the [repo](https://github.com/rancesDOT/NYCDOT-Pedestrian-counting-app)
