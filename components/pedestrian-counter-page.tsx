@@ -9,7 +9,6 @@ import VideoRestorePrompt from "@/components/video-restore-prompt"
 import VideoTimeInputDialog from "@/components/video-time-input-dialog"
 import VideoEndPrompt from "@/components/video-end-prompt"
 import { directionsConfig as directions } from "@/lib/key-mappings"
-import ExportOptionsDialog from "@/components/export-options-dialog"
 
 interface Intersection {
   id: string
@@ -75,15 +74,12 @@ export default function PedestrianCounterPage() {
   const [showVideoEndPrompt, setShowVideoEndPrompt] = useState(false)
   const [videoCount, setVideoCount] = useState(1)
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0)
-  const [showExportOptions, setShowExportOptions] = useState(false)
-  const [isExportAndEnd, setIsExportAndEnd] = useState(false)
 
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const autoSaveIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const isMountedRef = useRef(true)
 
   const saveToStorage = useCallback(() => {
     try {
@@ -180,15 +176,15 @@ export default function PedestrianCounterPage() {
   }, [])
 
   const handleVideoRestore = useCallback(
-    (file: File) => {
-      if (!savedStateForRestore) return
+      (file: File) => {
+        if (!savedStateForRestore) return
 
-      const url = URL.createObjectURL(file)
-      setVideoSrc(url)
-      setPendingVideoRestore(true)
-      setShowVideoRestorePrompt(false)
-    },
-    [savedStateForRestore],
+        const url = URL.createObjectURL(file)
+        setVideoSrc(url)
+        setPendingVideoRestore(true)
+        setShowVideoRestorePrompt(false)
+      },
+      [savedStateForRestore],
   )
 
   const handleRestorePromptDismiss = useCallback(() => {
@@ -214,7 +210,6 @@ export default function PedestrianCounterPage() {
     autoSaveIntervalRef.current = setInterval(saveToStorage, AUTO_SAVE_INTERVAL)
 
     return () => {
-      isMountedRef.current = false
       if (autoSaveIntervalRef.current) {
         clearInterval(autoSaveIntervalRef.current)
       }
@@ -268,114 +263,114 @@ export default function PedestrianCounterPage() {
     }
   }, [videoSrc])
 
-  const groupDataBy1Minute = useCallback(
-    (logEntries: LogEntry[]): GroupedEntry[] => {
-      if (logEntries.length === 0) return []
+  const groupDataBy15Seconds = useCallback(
+      (logEntries: LogEntry[]): GroupedEntry[] => {
+        if (logEntries.length === 0) return []
 
-      const intervalSize = 60 // Changed from 15 to 60 seconds
-      const groups: Record<string, GroupedEntry> = {}
+        const intervalSize = 15
+        const groups: Record<string, GroupedEntry> = {}
 
-      // Group by video index first, then by time intervals
-      const videoGroups: Record<number, LogEntry[]> = {}
-      logEntries.forEach((entry) => {
-        if (!videoGroups[entry.videoIndex]) {
-          videoGroups[entry.videoIndex] = []
-        }
-        videoGroups[entry.videoIndex].push(entry)
-      })
-
-      // Process each video's data
-      Object.entries(videoGroups).forEach(([videoIndexStr, videoEntries]) => {
-        const videoIndex = Number.parseInt(videoIndexStr)
-        const timestamps = videoEntries.map((entry) => entry.timestamp)
-        const minTime = Math.min(...timestamps)
-        const maxTime = Math.max(...timestamps)
-
-        const startInterval = Math.floor(minTime / intervalSize) * intervalSize
-        const endInterval = Math.floor(maxTime / intervalSize) * intervalSize
-
-        // Create all intervals for this video
-        for (let intervalStart = startInterval; intervalStart <= endInterval; intervalStart += intervalSize) {
-          const intervalEnd = intervalStart + intervalSize
-          const groupKey = `${videoIndex}-${intervalStart}`
-
-          let intervalLabel: string
-          let actualStartTime: Date | undefined
-          let actualEndTime: Date | undefined
-
-          if (recordingStartTime) {
-            actualStartTime = new Date(recordingStartTime.getTime() + intervalStart * 1000)
-            actualEndTime = new Date(recordingStartTime.getTime() + intervalEnd * 1000)
-            const startTimeStr = actualStartTime.toLocaleTimeString("en-US", {
-              hour12: false,
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-            })
-            const endTimeStr = actualEndTime.toLocaleTimeString("en-US", {
-              hour12: false,
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-            })
-            intervalLabel = `${startTimeStr} - ${endTimeStr}`
-          } else {
-            const startMinutes = Math.floor(intervalStart / 60)
-            const startSeconds = Math.floor(intervalStart % 60)
-            const endMinutes = Math.floor(intervalEnd / 60)
-            const endSeconds = Math.floor(intervalEnd % 60)
-            intervalLabel = `${startMinutes}:${startSeconds.toString().padStart(2, "0")}-${endMinutes}:${endSeconds.toString().padStart(2, "0")}`
+        // Group by video index first, then by time intervals
+        const videoGroups: Record<number, LogEntry[]> = {}
+        logEntries.forEach((entry) => {
+          if (!videoGroups[entry.videoIndex]) {
+            videoGroups[entry.videoIndex] = []
           }
-
-          groups[groupKey] = {
-            interval: intervalLabel,
-            startTime: intervalStart,
-            endTime: intervalEnd,
-            directions: directions.reduce((acc, dir) => ({ ...acc, [dir.name]: 0 }), {}),
-            totalCount: 0,
-            actualStartTime,
-            actualEndTime,
-            videoIndex,
-          }
-        }
-
-        // Populate with actual data
-        videoEntries.forEach((entry) => {
-          const intervalStart = Math.floor(entry.timestamp / intervalSize) * intervalSize
-          const groupKey = `${entry.videoIndex}-${intervalStart}`
-
-          const direction = directions.find((d) => d.key === entry.key)
-          if (direction && groups[groupKey]) {
-            groups[groupKey].directions[direction.name]++
-            groups[groupKey].totalCount++
-          }
+          videoGroups[entry.videoIndex].push(entry)
         })
-      })
 
-      return Object.values(groups).sort((a, b) => {
-        if (a.videoIndex !== b.videoIndex) {
-          return a.videoIndex! - b.videoIndex!
-        }
-        return a.startTime - b.startTime
-      })
-    },
-    [recordingStartTime],
+        // Process each video's data
+        Object.entries(videoGroups).forEach(([videoIndexStr, videoEntries]) => {
+          const videoIndex = Number.parseInt(videoIndexStr)
+          const timestamps = videoEntries.map((entry) => entry.timestamp)
+          const minTime = Math.min(...timestamps)
+          const maxTime = Math.max(...timestamps)
+
+          const startInterval = Math.floor(minTime / intervalSize) * intervalSize
+          const endInterval = Math.floor(maxTime / intervalSize) * intervalSize
+
+          // Create all intervals for this video
+          for (let intervalStart = startInterval; intervalStart <= endInterval; intervalStart += intervalSize) {
+            const intervalEnd = intervalStart + intervalSize
+            const groupKey = `${videoIndex}-${intervalStart}`
+
+            let intervalLabel: string
+            let actualStartTime: Date | undefined
+            let actualEndTime: Date | undefined
+
+            if (recordingStartTime) {
+              actualStartTime = new Date(recordingStartTime.getTime() + intervalStart * 1000)
+              actualEndTime = new Date(recordingStartTime.getTime() + intervalEnd * 1000)
+              const startTimeStr = actualStartTime.toLocaleTimeString("en-US", {
+                hour12: false,
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              })
+              const endTimeStr = actualEndTime.toLocaleTimeString("en-US", {
+                hour12: false,
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              })
+              intervalLabel = `${startTimeStr} - ${endTimeStr}`
+            } else {
+              const startMinutes = Math.floor(intervalStart / 60)
+              const startSeconds = Math.floor(intervalStart % 60)
+              const endMinutes = Math.floor(intervalEnd / 60)
+              const endSeconds = Math.floor(intervalEnd % 60)
+              intervalLabel = `${startMinutes}:${startSeconds.toString().padStart(2, "0")}-${endMinutes}:${endSeconds.toString().padStart(2, "0")}`
+            }
+
+            groups[groupKey] = {
+              interval: intervalLabel,
+              startTime: intervalStart,
+              endTime: intervalEnd,
+              directions: directions.reduce((acc, dir) => ({ ...acc, [dir.name]: 0 }), {}),
+              totalCount: 0,
+              actualStartTime,
+              actualEndTime,
+              videoIndex,
+            }
+          }
+
+          // Populate with actual data
+          videoEntries.forEach((entry) => {
+            const intervalStart = Math.floor(entry.timestamp / intervalSize) * intervalSize
+            const groupKey = `${entry.videoIndex}-${intervalStart}`
+
+            const direction = directions.find((d) => d.key === entry.key)
+            if (direction && groups[groupKey]) {
+              groups[groupKey].directions[direction.name]++
+              groups[groupKey].totalCount++
+            }
+          })
+        })
+
+        return Object.values(groups).sort((a, b) => {
+          if (a.videoIndex !== b.videoIndex) {
+            return a.videoIndex! - b.videoIndex!
+          }
+          return a.startTime - b.startTime
+        })
+      },
+      [recordingStartTime],
   )
 
   const handleCount = useCallback(
-    (key: string) => {
-      const directionConfig = directions.find((d) => d.key === key)
-      if (!directionConfig || !videoSrc || intersections.length !== 4) return
+      (key: string) => {
+        const directionConfig = directions.find((d) => d.key === key)
+        if (!directionConfig || !videoSrc || intersections.length !== 4) return
 
-      const timestamp = videoRef.current?.currentTime ?? 0
-      setLog((prev) => [...prev, { key, timestamp, videoIndex: currentVideoIndex }])
+        const timestamp = videoRef.current?.currentTime ?? 0
+        setLog((prev) => [...prev, { key, timestamp, videoIndex: currentVideoIndex }])
 
-      const newCount = (counts[directionConfig.name] || 0) + 1
-      setCounts((prev) => ({ ...prev, [directionConfig.name]: newCount }))
+        const newCount = (counts[directionConfig.name] || 0) + 1
+        setCounts((prev) => ({ ...prev, [directionConfig.name]: newCount }))
 
-      setLastPressed({ key, direction: directionConfig.direction })
-    },
-    [counts, videoSrc, intersections.length, currentVideoIndex],
+        setLastPressed({ key, direction: directionConfig.direction })
+      },
+      [counts, videoSrc, intersections.length, currentVideoIndex],
   )
 
   const handleUndo = useCallback(() => {
@@ -453,26 +448,10 @@ export default function PedestrianCounterPage() {
 
   const handleFinish = useCallback(() => {
     if (log.length === 0) return
-    const grouped = groupDataBy1Minute(log)
+    const grouped = groupDataBy15Seconds(log)
     setGroupedData(grouped)
-    setShowExportOptions(true)
-  }, [log, groupDataBy1Minute])
-
-  const handleExportPreview = useCallback(() => {
-    setShowExportOptions(false)
     setShowExportModal(true)
-    setIsExportAndEnd(false)
-  }, [])
-
-  const handleExportAndEnd = useCallback(() => {
-    setShowExportOptions(false)
-    setShowExportModal(true)
-    setIsExportAndEnd(true)
-  }, [])
-
-  const handleCancelExport = useCallback(() => {
-    setShowExportOptions(false)
-  }, [])
+  }, [log, groupDataBy15Seconds])
 
   const handleExportComplete = useCallback(() => {
     setShowExportModal(false)
@@ -489,47 +468,30 @@ export default function PedestrianCounterPage() {
       }
 
       downloadCSV(groupedData, filename)
-
-      if (isExportAndEnd) {
-        handleClearVideo()
-      }
     }
-  }, [groupedData, downloadCSV, recordingStartTime, isExportAndEnd, handleClearVideo])
+  }, [groupedData, downloadCSV, recordingStartTime])
 
   const togglePlay = useCallback(() => {
-    if (!videoRef.current || !isMountedRef.current) return
-
+    if (!videoRef.current) return
     try {
       if (videoRef.current.paused) {
-        const playPromise = videoRef.current.play()
-        if (playPromise !== undefined) {
-          playPromise.catch((error) => {
-            // Only log if it's not an AbortError and component is still mounted
-            if (error.name !== "AbortError" && isMountedRef.current) {
-              console.error("Error playing video:", error)
-            }
-          })
-        }
+        videoRef.current.play()
       } else {
         videoRef.current.pause()
       }
     } catch (error) {
-      if (isMountedRef.current) {
-        console.error("Error toggling video playback:", error)
-      }
+      console.error("Error toggling video playback:", error)
     }
   }, [])
 
   const changePlaybackRate = useCallback((rate: number) => {
-    if (!videoRef.current || !isMountedRef.current) return
+    if (!videoRef.current) return
     try {
       const newRate = Math.max(0.25, Math.min(4, rate))
       videoRef.current.playbackRate = newRate
       setPlaybackRate(newRate)
     } catch (error) {
-      if (isMountedRef.current) {
-        console.error("Error changing playback rate:", error)
-      }
+      console.error("Error changing playback rate:", error)
     }
   }, [])
 
@@ -633,10 +595,10 @@ export default function PedestrianCounterPage() {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
-        event.target instanceof HTMLInputElement ||
-        event.target instanceof HTMLTextAreaElement ||
-        event.target instanceof HTMLSelectElement ||
-        (event.target as Element)?.closest("input, textarea, select, [contenteditable]")
+          event.target instanceof HTMLInputElement ||
+          event.target instanceof HTMLTextAreaElement ||
+          event.target instanceof HTMLSelectElement ||
+          (event.target as Element)?.closest("input, textarea, select, [contenteditable]")
       ) {
         return
       }
@@ -681,12 +643,12 @@ export default function PedestrianCounterPage() {
 
   if (!isDataLoaded) {
     return (
-      <div className="h-screen w-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-slate-600 dark:text-slate-300">Loading saved data...</p>
+        <div className="h-screen w-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-slate-600 dark:text-slate-300">Loading saved data...</p>
+          </div>
         </div>
-      </div>
     )
   }
 
@@ -694,123 +656,114 @@ export default function PedestrianCounterPage() {
 
   // Calculate last direction count
   const lastDirectionCount = lastPressed
-    ? (() => {
+      ? (() => {
         const directionConfig = directions.find((d) => d.key === lastPressed.key)
         return directionConfig ? counts[directionConfig.name] || 0 : 0
       })()
-    : 0
+      : 0
 
   return (
-    <>
-      <main
-        className={`h-screen w-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex flex-col p-4 gap-0 overflow-hidden transition-all duration-300 ${showHelpSidebar ? "pr-84" : ""}`}
-      >
-        <div className="flex-grow h-full min-h-0">
-          <VideoPlayer
-            ref={videoRef}
-            videoSrc={videoSrc}
-            onVideoSelect={handleVideoSelect}
-            onPlay={() => setIsPlaying(true)}
-            onPause={() => setIsPlaying(false)}
-            lastPressed={lastPressed}
-            onIntersectionsSet={setIntersections}
-            onTimeUpdate={handleTimeUpdate}
-            onLoadedMetadata={handleLoadedMetadata}
-          />
-        </div>
-        <div className="flex-shrink-0">
-          <VideoControls
-            isPlaying={isPlaying}
-            playbackRate={playbackRate}
-            onTogglePlay={togglePlay}
-            onChangePlaybackRate={changePlaybackRate}
-            isVideoLoaded={!!videoSrc}
-            onUndo={handleUndo}
-            onFinish={handleFinish}
-            onClearVideo={handleClearVideo}
-            canUndo={log.length > 0}
-            canFinish={log.length > 0}
-            currentTime={currentTime}
-            duration={duration}
-            onSeek={handleSeek}
-            onShowHelp={handleShowHelp}
-            lastPressed={lastPressed}
-            intersectionsSet={intersections.length === 4}
-            totalCount={totalCounts}
-            lastDirectionCount={lastDirectionCount}
-          />
-        </div>
-      </main>
+      <>
+        <main
+            className={`h-screen w-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex flex-col p-4 gap-0 overflow-hidden transition-all duration-300 ${showHelpSidebar ? "pr-84" : ""}`}
+        >
+          <div className="flex-grow h-full min-h-0">
+            <VideoPlayer
+                ref={videoRef}
+                videoSrc={videoSrc}
+                onVideoSelect={handleVideoSelect}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+                lastPressed={lastPressed}
+                onIntersectionsSet={setIntersections}
+                onTimeUpdate={handleTimeUpdate}
+                onLoadedMetadata={handleLoadedMetadata}
+            />
+          </div>
+          <div className="flex-shrink-0">
+            <VideoControls
+                isPlaying={isPlaying}
+                playbackRate={playbackRate}
+                onTogglePlay={togglePlay}
+                onChangePlaybackRate={changePlaybackRate}
+                isVideoLoaded={!!videoSrc}
+                onUndo={handleUndo}
+                onFinish={handleFinish}
+                onClearVideo={handleClearVideo}
+                canUndo={log.length > 0}
+                canFinish={log.length > 0}
+                currentTime={currentTime}
+                duration={duration}
+                onSeek={handleSeek}
+                onShowHelp={handleShowHelp}
+                lastPressed={lastPressed}
+                intersectionsSet={intersections.length === 4}
+                totalCount={totalCounts}
+                lastDirectionCount={lastDirectionCount}
+            />
+          </div>
+        </main>
 
-      <VideoTimeInputDialog
-        isOpen={showTimeInputDialog}
-        onConfirm={handleTimeInputConfirm}
-        onSkip={handleTimeInputSkip}
-      />
-
-      <VideoEndPrompt
-        isOpen={showVideoEndPrompt}
-        onUploadNew={handleNewVideoUpload}
-        onExport={handleVideoEndExport}
-        onReplay={handleReplayVideo}
-        totalCounts={totalCounts}
-        videoCount={videoCount}
-        isLastVideo={currentVideoIndex === videoCount - 1}
-      />
-
-      <ExportProgressModal
-        isOpen={showExportModal}
-        onComplete={handleExportComplete}
-        totalEntries={log.length}
-        groupedEntries={groupedData.length}
-      />
-
-      <HelpSidebar
-        isOpen={showHelpSidebar}
-        onClose={() => setShowHelpSidebar(false)}
-        onCount={handleCount}
-        onUndo={handleUndo}
-        intersectionsSet={intersections.length === 4}
-        canUndo={log.length > 0}
-      />
-
-      {showVideoRestorePrompt && savedStateForRestore && (
-        <VideoRestorePrompt
-          isOpen={showVideoRestorePrompt}
-          onVideoRestore={handleVideoRestore}
-          onDismiss={handleRestorePromptDismiss}
-          savedData={{
-            currentTime: savedStateForRestore.currentTime,
-            duration: savedStateForRestore.duration,
-            totalCounts: totalCounts,
-            intersectionCount: savedStateForRestore.intersections.length,
-            lastSaved: savedStateForRestore.lastSaved,
-          }}
+        <VideoTimeInputDialog
+            isOpen={showTimeInputDialog}
+            onConfirm={handleTimeInputConfirm}
+            onSkip={handleTimeInputSkip}
         />
-      )}
-      <input
-        type="file"
-        id="video-upload-hidden"
-        accept="video/mp4, video/webm, video/ogg"
-        style={{ display: "none" }}
-        onChange={(e) => {
-          const file = (e.target as HTMLInputElement).files?.[0]
-          if (file) {
-            const url = URL.createObjectURL(file)
-            handleVideoSelect(url)
-          }
-          // Reset the input value
-          e.target.value = ""
-        }}
-      />
-      <ExportOptionsDialog
-        isOpen={showExportOptions}
-        onPreview={handleExportPreview}
-        onExportAndEnd={handleExportAndEnd}
-        onCancel={handleCancelExport}
-        totalEntries={log.length}
-        groupedEntries={groupedData.length}
-      />
-    </>
+
+        <VideoEndPrompt
+            isOpen={showVideoEndPrompt}
+            onUploadNew={handleNewVideoUpload}
+            onExport={handleVideoEndExport}
+            onReplay={handleReplayVideo}
+            totalCounts={totalCounts}
+            videoCount={videoCount}
+        />
+
+        <ExportProgressModal
+            isOpen={showExportModal}
+            onComplete={handleExportComplete}
+            totalEntries={log.length}
+            groupedEntries={groupedData.length}
+        />
+
+        <HelpSidebar
+            isOpen={showHelpSidebar}
+            onClose={() => setShowHelpSidebar(false)}
+            onCount={handleCount}
+            onUndo={handleUndo}
+            intersectionsSet={intersections.length === 4}
+            canUndo={log.length > 0}
+        />
+
+        {showVideoRestorePrompt && savedStateForRestore && (
+            <VideoRestorePrompt
+                isOpen={showVideoRestorePrompt}
+                onVideoRestore={handleVideoRestore}
+                onDismiss={handleRestorePromptDismiss}
+                savedData={{
+                  currentTime: savedStateForRestore.currentTime,
+                  duration: savedStateForRestore.duration,
+                  totalCounts: totalCounts,
+                  intersectionCount: savedStateForRestore.intersections.length,
+                  lastSaved: savedStateForRestore.lastSaved,
+                }}
+            />
+        )}
+        <input
+            type="file"
+            id="video-upload-hidden"
+            accept="video/mp4, video/webm, video/ogg"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const file = (e.target as HTMLInputElement).files?.[0]
+              if (file) {
+                const url = URL.createObjectURL(file)
+                handleVideoSelect(url)
+              }
+              // Reset the input value
+              e.target.value = ""
+            }}
+        />
+      </>
   )
 }
