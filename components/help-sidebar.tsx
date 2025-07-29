@@ -251,7 +251,7 @@ export default function HelpSidebar({
                           </span>
                         </div>
                         <div className="text-gray-500 dark:text-gray-400 flex-shrink-0 ml-3 flex items-center gap-2">
-                          {isClickable && <div className="text-xs text-blue-600 dark:text-blue-400">✨</div>}
+                          {isClickable && <div className="text-xs text-blue-600 dark:text-blue-400"></div>}
                         </div>
                       </div>
                     )
