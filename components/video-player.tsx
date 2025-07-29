@@ -374,33 +374,33 @@ const VideoPlayer = React.forwardRef<HTMLVideoElement, VideoPlayerProps>(
                     <p className="text-lg font-semibold mb-2 leading-tight">3Drag & drop video here</p>
                     <p className="text-sm mb-4 leading-tight">or click anywhere to select a file</p>
 
-                    <div className="bg-slate-100 dark:bg-slate-700 rounded-lg px-4 py-3 mb-4 max-w-sm relative">
-                      <p className="text-xs text-slate-600 dark:text-slate-300 mb-2">
+                    <div className="bg-slate-100 dark:bg-slate-700 rounded-lg px-6 py-5 mb-6 max-w-md relative">
+                      <p className="text-sm text-slate-600 dark:text-slate-300 mb-3 font-medium">
                         <strong>Supported formats:</strong>
                       </p>
-                      <div className="flex flex-wrap gap-2 justify-center">
+                      <div className="flex flex-wrap gap-3 justify-center">
     <span
-        className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-1 rounded text-xs font-medium">
+        className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-3 py-2 rounded text-sm font-semibold">
       MP4
     </span>
                         <span
-                            className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded text-xs font-medium">
+                            className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-3 py-2 rounded text-sm font-semibold">
       WebM
     </span>
                         <span
-                            className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-1 rounded text-xs font-medium">
+                            className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-3 py-2 rounded text-sm font-semibold">
       OGG
     </span>
                       </div>
 
                       <div
-                          className="bg-slate-100 dark:bg-slate-700 rounded-lg px-4 py-3 mb-4 max-w-sm relative"
+                          className="bg-slate-100 dark:bg-slate-700 rounded-lg px-6 py-5 mt-5 max-w-md relative"
                           onClick={(e) => e.stopPropagation()}
                           onDragEnter={(e) => e.stopPropagation()}
                           onDragOver={(e) => e.stopPropagation()}
                           onDrop={(e) => e.stopPropagation()}
                       >
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 font-medium">
                           AVI files need to be converted first
                         </p>
                         <button
@@ -412,12 +412,11 @@ const VideoPlayer = React.forwardRef<HTMLVideoElement, VideoPlayerProps>(
                                   "width=800,height=600"
                               )
                             }}
-                            className="mt-3 text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded shadow-sm transition-all"
+                            className="mt-4 text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow-sm transition-all font-semibold"
                         >
                           Convert AVI files
                         </button>
                       </div>
-
                     </div>
 
 
