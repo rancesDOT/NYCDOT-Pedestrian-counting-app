@@ -371,7 +371,7 @@ const VideoPlayer = React.forwardRef<HTMLVideoElement, VideoPlayerProps>(
                       className="text-center text-muted-foreground p-8 select-none flex flex-col items-center justify-center w-full h-full">
                     <UploadCloud
                         className="h-16 w-16 text-slate-400 mb-4 transition-transform duration-300 hover:scale-110"/>
-                    <p className="text-lg font-semibold mb-2 leading-tight">Drag & drop video here</p>
+                    <p className="text-lg font-semibold mb-2 leading-tight">3Drag & drop video here</p>
                     <p className="text-sm mb-4 leading-tight">or click anywhere to select a file</p>
 
                     <div className="bg-slate-100 dark:bg-slate-700 rounded-lg px-4 py-3 mb-4 max-w-sm relative">
@@ -392,15 +392,32 @@ const VideoPlayer = React.forwardRef<HTMLVideoElement, VideoPlayerProps>(
       OGG
     </span>
                       </div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                        AVI files need to be converted first
-                      </p>
-                      <button
-                          onClick={() => window.open('https://avi-converter-dot.streamlit.app/', 'aviConverter', 'width=800,height=600')}
-                          className="mt-3 text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded shadow-sm transition-all"
+
+                      <div
+                          className="bg-slate-100 dark:bg-slate-700 rounded-lg px-4 py-3 mb-4 max-w-sm relative"
+                          onClick={(e) => e.stopPropagation()}
+                          onDragEnter={(e) => e.stopPropagation()}
+                          onDragOver={(e) => e.stopPropagation()}
+                          onDrop={(e) => e.stopPropagation()}
                       >
-                        Convert AVI files
-                      </button>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                          AVI files need to be converted first
+                        </p>
+                        <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              window.open(
+                                  "https://avi-converter-dot.streamlit.app/",
+                                  "aviConverter",
+                                  "width=800,height=600"
+                              )
+                            }}
+                            className="mt-3 text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded shadow-sm transition-all"
+                        >
+                          Convert AVI files
+                        </button>
+                      </div>
+
                     </div>
 
 
