@@ -32,7 +32,12 @@ export default function RootLayout({
                 <Link href="/counter" className="hover:underline">
                   Counter
                 </Link>
+              </li><li>
+                <Link href="/categorizer" className="hover:underline">
+                  categorizer
+                </Link>
               </li>
+
             </ul>
           </nav>
         </header>
