@@ -34,6 +34,11 @@ interface GroupedEntry {
   videoIndex?: number
 }
 
+interface VideoMetadata {
+  recordingStartTime: Date | null
+  intersections: Intersection[]
+}
+
 interface SavedState {
   counts: Record<string, number>
   log: LogEntry[]
@@ -47,12 +52,19 @@ interface SavedState {
   recordingStartTime?: string // ISO string
   videoCount: number
   currentVideoIndex: number
+  videoMetadata: Record<number, VideoMetadata> // Store metadata per video
 }
 
 const initialCounts = directions.reduce((acc, dir) => ({ ...acc, [dir.name]: 0 }), {})
 
 const STORAGE_KEY = "pedestrian-counter-data"
 const AUTO_SAVE_INTERVAL = 5000
+
+// Configuration constants for easy modification
+const DATA_GROUPING_CONFIG = {
+  INTERVAL_SIZE_SECONDS: 60, // 1 minute intervals
+  INTERVAL_LABEL: "1-minute", // Used for logging and debugging
+} as const
 
 export default function PedestrianCounterPage() {
   const [counts, setCounts] = useState<Record<string, number>>(initialCounts)
@@ -74,12 +86,56 @@ export default function PedestrianCounterPage() {
   const [showVideoEndPrompt, setShowVideoEndPrompt] = useState(false)
   const [videoCount, setVideoCount] = useState(1)
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0)
+  const [videoMetadata, setVideoMetadata] = useState<Record<number, VideoMetadata>>({})
 
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const autoSaveIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  /**
+   * Formats time interval for display
+   * @param startSeconds - Start time in seconds
+   * @param endSeconds - End time in seconds
+   * @param intervalSize - Size of interval in seconds
+   * @returns Formatted time string
+   */
+  const formatTimeInterval = useCallback((startSeconds: number, endSeconds: number, intervalSize: number): string => {
+    if (intervalSize >= 60) {
+      // For intervals >= 1 minute, show in MM:SS format
+      const startMinutes = Math.floor(startSeconds / 60)
+      const startSecondsRemainder = Math.floor(startSeconds % 60)
+      const endMinutes = Math.floor(endSeconds / 60)
+      const endSecondsRemainder = Math.floor(endSeconds % 60)
+      return `${startMinutes}:${startSecondsRemainder.toString().padStart(2, "0")}-${endMinutes}:${endSecondsRemainder.toString().padStart(2, "0")}`
+    } else {
+      // For intervals < 1 minute, show in seconds
+      return `${startSeconds}s-${endSeconds}s`
+    }
+  }, [])
+
+  /**
+   * Formats actual time (wall clock time) for display
+   * @param startTime - Start Date object
+   * @param endTime - End Date object
+   * @returns Formatted time string
+   */
+  const formatActualTimeInterval = useCallback((startTime: Date, endTime: Date): string => {
+    const startTimeStr = startTime.toLocaleTimeString("en-US", {
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+    const endTimeStr = endTime.toLocaleTimeString("en-US", {
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+    return `${startTimeStr} - ${endTimeStr}`
+  }, [])
 
   const saveToStorage = useCallback(() => {
     try {
@@ -95,6 +151,7 @@ export default function PedestrianCounterPage() {
         recordingStartTime: recordingStartTime?.toISOString(),
         videoCount,
         currentVideoIndex,
+        videoMetadata,
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave))
       console.log("Data saved to localStorage")
@@ -112,6 +169,7 @@ export default function PedestrianCounterPage() {
     recordingStartTime,
     videoCount,
     currentVideoIndex,
+    videoMetadata,
   ])
 
   const loadFromStorage = useCallback(() => {
@@ -140,6 +198,7 @@ export default function PedestrianCounterPage() {
           setRecordingStartTime(parsedData.recordingStartTime ? new Date(parsedData.recordingStartTime) : null)
           setVideoCount(parsedData.videoCount || 1)
           setCurrentVideoIndex(parsedData.currentVideoIndex || 0)
+          setVideoMetadata(parsedData.videoMetadata || {})
 
           return true
         }
@@ -154,6 +213,7 @@ export default function PedestrianCounterPage() {
         setRecordingStartTime(parsedData.recordingStartTime ? new Date(parsedData.recordingStartTime) : null)
         setVideoCount(parsedData.videoCount || 1)
         setCurrentVideoIndex(parsedData.currentVideoIndex || 0)
+        setVideoMetadata(parsedData.videoMetadata || {})
 
         console.log("Data loaded from localStorage")
         return true
@@ -225,6 +285,7 @@ export default function PedestrianCounterPage() {
     recordingStartTime,
     videoCount,
     currentVideoIndex,
+    videoMetadata,
   ])
 
   useEffect(() => {
@@ -263,11 +324,18 @@ export default function PedestrianCounterPage() {
     }
   }, [videoSrc])
 
-  const groupDataBy15Seconds = useCallback(
-      (logEntries: LogEntry[]): GroupedEntry[] => {
+  /**
+   * Groups log entries by configurable time intervals
+   * @param logEntries - Array of log entries to group
+   * @param intervalSize - Size of interval in seconds (defaults to config value)
+   * @returns Array of grouped entries
+   */
+  const groupDataByInterval = useCallback(
+      (logEntries: LogEntry[], intervalSize: number = DATA_GROUPING_CONFIG.INTERVAL_SIZE_SECONDS): GroupedEntry[] => {
         if (logEntries.length === 0) return []
 
-        const intervalSize = 15
+        console.log(`Grouping data by ${intervalSize}s intervals (${DATA_GROUPING_CONFIG.INTERVAL_LABEL})`)
+
         const groups: Record<string, GroupedEntry> = {}
 
         // Group by video index first, then by time intervals
@@ -289,6 +357,9 @@ export default function PedestrianCounterPage() {
           const startInterval = Math.floor(minTime / intervalSize) * intervalSize
           const endInterval = Math.floor(maxTime / intervalSize) * intervalSize
 
+          // Get the recording start time for this specific video
+          const videoRecordingStartTime = videoMetadata[videoIndex]?.recordingStartTime
+
           // Create all intervals for this video
           for (let intervalStart = startInterval; intervalStart <= endInterval; intervalStart += intervalSize) {
             const intervalEnd = intervalStart + intervalSize
@@ -298,28 +369,12 @@ export default function PedestrianCounterPage() {
             let actualStartTime: Date | undefined
             let actualEndTime: Date | undefined
 
-            if (recordingStartTime) {
-              actualStartTime = new Date(recordingStartTime.getTime() + intervalStart * 1000)
-              actualEndTime = new Date(recordingStartTime.getTime() + intervalEnd * 1000)
-              const startTimeStr = actualStartTime.toLocaleTimeString("en-US", {
-                hour12: false,
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-              })
-              const endTimeStr = actualEndTime.toLocaleTimeString("en-US", {
-                hour12: false,
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-              })
-              intervalLabel = `${startTimeStr} - ${endTimeStr}`
+            if (videoRecordingStartTime) {
+              actualStartTime = new Date(videoRecordingStartTime.getTime() + intervalStart * 1000)
+              actualEndTime = new Date(videoRecordingStartTime.getTime() + intervalEnd * 1000)
+              intervalLabel = `Video ${videoIndex + 1}: ${formatActualTimeInterval(actualStartTime, actualEndTime)}`
             } else {
-              const startMinutes = Math.floor(intervalStart / 60)
-              const startSeconds = Math.floor(intervalStart % 60)
-              const endMinutes = Math.floor(intervalEnd / 60)
-              const endSeconds = Math.floor(intervalEnd % 60)
-              intervalLabel = `${startMinutes}:${startSeconds.toString().padStart(2, "0")}-${endMinutes}:${endSeconds.toString().padStart(2, "0")}`
+              intervalLabel = `Video ${videoIndex + 1}: ${formatTimeInterval(intervalStart, intervalEnd, intervalSize)}`
             }
 
             groups[groupKey] = {
@@ -354,7 +409,7 @@ export default function PedestrianCounterPage() {
           return a.startTime - b.startTime
         })
       },
-      [recordingStartTime],
+      [videoMetadata, formatTimeInterval, formatActualTimeInterval],
   )
 
   const handleCount = useCallback(
@@ -415,6 +470,7 @@ export default function PedestrianCounterPage() {
     setRecordingStartTime(null)
     setVideoCount(1)
     setCurrentVideoIndex(0)
+    setVideoMetadata({})
     clearStorage()
   }, [clearStorage])
 
@@ -448,10 +504,10 @@ export default function PedestrianCounterPage() {
 
   const handleFinish = useCallback(() => {
     if (log.length === 0) return
-    const grouped = groupDataBy15Seconds(log)
+    const grouped = groupDataByInterval(log)
     setGroupedData(grouped)
     setShowExportModal(true)
-  }, [log, groupDataBy15Seconds])
+  }, [log, groupDataByInterval])
 
   const handleExportComplete = useCallback(() => {
     setShowExportModal(false)
@@ -460,16 +516,21 @@ export default function PedestrianCounterPage() {
       const timestamp = now.toISOString().slice(0, 19).replace(/:/g, "-")
 
       let filename: string
-      if (recordingStartTime) {
-        const recordingDate = recordingStartTime.toISOString().slice(0, 10)
-        filename = `pedestrian_counts_${recordingDate}_${timestamp}.csv`
+      if (Object.keys(videoMetadata).length > 0) {
+        const firstVideoStartTime = videoMetadata[0]?.recordingStartTime
+        if (firstVideoStartTime) {
+          const recordingDate = firstVideoStartTime.toISOString().slice(0, 10)
+          filename = `pedestrian_counts_${DATA_GROUPING_CONFIG.INTERVAL_LABEL}_${recordingDate}_${timestamp}.csv`
+        } else {
+          filename = `pedestrian_counts_${DATA_GROUPING_CONFIG.INTERVAL_LABEL}_multi_video_${timestamp}.csv`
+        }
       } else {
-        filename = `pedestrian_counts_video_time_${timestamp}.csv`
+        filename = `pedestrian_counts_${DATA_GROUPING_CONFIG.INTERVAL_LABEL}_video_time_${timestamp}.csv`
       }
 
       downloadCSV(groupedData, filename)
     }
-  }, [groupedData, downloadCSV, recordingStartTime])
+  }, [groupedData, downloadCSV, videoMetadata])
 
   const togglePlay = useCallback(() => {
     if (!videoRef.current) return
@@ -495,32 +556,80 @@ export default function PedestrianCounterPage() {
     }
   }, [])
 
-  const handleVideoSelect = useCallback((src: string | null) => {
-    setVideoSrc(src)
-    setIntersections([])
-    if (src) {
-      // Only reset video-specific data, keep accumulated counts and log
-      setIsPlaying(false)
-      setPlaybackRate(1)
-      setCurrentTime(0)
-      setDuration(0)
-      setLastPressed(null)
-      setRecordingStartTime(null)
+  const handleVideoSelect = useCallback(
+      (src: string | null) => {
+        // Store current video's metadata before switching
+        if (currentVideoIndex >= 0 && (intersections.length > 0 || recordingStartTime)) {
+          setVideoMetadata((prev) => ({
+            ...prev,
+            [currentVideoIndex]: {
+              recordingStartTime,
+              intersections: [...intersections],
+            },
+          }))
+        }
 
-      // Show time input dialog when new video is selected
-      setShowTimeInputDialog(true)
-    }
-  }, [])
+        setVideoSrc(src)
+
+        if (src) {
+          // Check if we have existing metadata for this video
+          const existingMetadata = videoMetadata[currentVideoIndex]
+
+          if (existingMetadata) {
+            // Restore intersections and recording start time for this video
+            setIntersections(existingMetadata.intersections)
+            setRecordingStartTime(existingMetadata.recordingStartTime)
+          } else {
+            // For new videos, try to reuse intersections from the most recent video
+            const mostRecentVideoIndex = Math.max(0, currentVideoIndex - 1)
+            const mostRecentMetadata = videoMetadata[mostRecentVideoIndex]
+
+            if (mostRecentMetadata && mostRecentMetadata.intersections.length === 4) {
+              // Reuse intersections from previous video
+              setIntersections(mostRecentMetadata.intersections)
+              console.log(`Reusing intersections from video ${mostRecentVideoIndex}`)
+            } else {
+              // No previous intersections available, clear them
+              setIntersections([])
+            }
+
+            // Always ask for new recording start time for new videos
+            setRecordingStartTime(null)
+            setShowTimeInputDialog(true)
+          }
+
+          // Reset video-specific playback state
+          setIsPlaying(false)
+          setPlaybackRate(1)
+          setCurrentTime(0)
+          setDuration(0)
+          setLastPressed(null)
+        }
+      },
+      [currentVideoIndex, intersections, recordingStartTime, videoMetadata],
+  )
 
   const handleNewVideoUpload = useCallback(() => {
     setShowVideoEndPrompt(false)
+
+    // Store current video's metadata
+    if (currentVideoIndex >= 0) {
+      setVideoMetadata((prev) => ({
+        ...prev,
+        [currentVideoIndex]: {
+          recordingStartTime,
+          intersections: [...intersections],
+        },
+      }))
+    }
+
     setCurrentVideoIndex(videoCount)
     setVideoCount((prev) => prev + 1)
 
     // Trigger file upload
     const fileInput = document.getElementById("video-upload-hidden") as HTMLInputElement
     fileInput?.click()
-  }, [videoCount])
+  }, [videoCount, currentVideoIndex, recordingStartTime, intersections])
 
   const handleVideoEndExport = useCallback(() => {
     setShowVideoEndPrompt(false)
@@ -535,15 +644,36 @@ export default function PedestrianCounterPage() {
     }
   }, [])
 
-  const handleTimeInputConfirm = useCallback((startTime: Date) => {
-    setRecordingStartTime(startTime)
-    setShowTimeInputDialog(false)
-  }, [])
+  const handleTimeInputConfirm = useCallback(
+      (startTime: Date) => {
+        setRecordingStartTime(startTime)
+        setShowTimeInputDialog(false)
+
+        // Update metadata for current video
+        setVideoMetadata((prev) => ({
+          ...prev,
+          [currentVideoIndex]: {
+            recordingStartTime: startTime,
+            intersections: [...intersections],
+          },
+        }))
+      },
+      [currentVideoIndex, intersections],
+  )
 
   const handleTimeInputSkip = useCallback(() => {
     setRecordingStartTime(null)
     setShowTimeInputDialog(false)
-  }, [])
+
+    // Update metadata for current video
+    setVideoMetadata((prev) => ({
+      ...prev,
+      [currentVideoIndex]: {
+        recordingStartTime: null,
+        intersections: [...intersections],
+      },
+    }))
+  }, [currentVideoIndex, intersections])
 
   const handleTimeUpdate = useCallback(() => {
     if (videoRef.current) {
@@ -591,6 +721,23 @@ export default function PedestrianCounterPage() {
   const handleShowHelp = useCallback(() => {
     setShowHelpSidebar(true)
   }, [])
+
+  // Update intersections handler to save to metadata
+  const handleIntersectionsSet = useCallback(
+      (newIntersections: Intersection[]) => {
+        setIntersections(newIntersections)
+
+        // Update metadata for current video
+        setVideoMetadata((prev) => ({
+          ...prev,
+          [currentVideoIndex]: {
+            recordingStartTime,
+            intersections: [...newIntersections],
+          },
+        }))
+      },
+      [currentVideoIndex, recordingStartTime],
+  )
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -675,7 +822,7 @@ export default function PedestrianCounterPage() {
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
                 lastPressed={lastPressed}
-                onIntersectionsSet={setIntersections}
+                onIntersectionsSet={handleIntersectionsSet}
                 onTimeUpdate={handleTimeUpdate}
                 onLoadedMetadata={handleLoadedMetadata}
             />
