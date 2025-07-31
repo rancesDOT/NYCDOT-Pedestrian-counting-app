@@ -62,7 +62,7 @@ const AUTO_SAVE_INTERVAL = 5000
 
 // Configuration constants for easy modification
 const DATA_GROUPING_CONFIG = {
-  INTERVAL_SIZE_SECONDS: 900, // 1 minute intervals
+  INTERVAL_SIZE_SECONDS: 60,
 } as const
 
 export default function PedestrianCounterPage() {
@@ -86,6 +86,7 @@ export default function PedestrianCounterPage() {
   const [videoCount, setVideoCount] = useState(1)
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0)
   const [videoMetadata, setVideoMetadata] = useState<Record<number, VideoMetadata>>({})
+  const [isExporting, setIsExporting] = useState(false) // State to prevent duplicate exports
 
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
@@ -285,6 +286,7 @@ export default function PedestrianCounterPage() {
     videoCount,
     currentVideoIndex,
     videoMetadata,
+    isExporting, // Added isExporting to dependencies to ensure saveToStorage reacts to its changes
   ])
 
   useEffect(() => {
@@ -509,25 +511,25 @@ export default function PedestrianCounterPage() {
 
         document.body.appendChild(link)
 
-        // Add a small delay to ensure the link is properly added to DOM
-        setTimeout(() => {
+        // Use requestAnimationFrame for better timing before click
+        requestAnimationFrame(() => {
           try {
             link.click()
             console.log(`CSV download triggered: ${filename}`)
 
-            // Clean up after a delay
+            // Clean up after a short delay to ensure download starts
             setTimeout(() => {
               document.body.removeChild(link)
               URL.revokeObjectURL(url)
               resolve()
-            }, 100)
+            }, 100) // Small delay to ensure browser registers the click
           } catch (clickError) {
             console.error("Error clicking download link:", clickError)
             document.body.removeChild(link)
             URL.revokeObjectURL(url)
             reject(clickError)
           }
-        }, 10)
+        })
       } catch (error) {
         console.error("Error creating CSV download:", error)
         reject(error)
@@ -541,19 +543,26 @@ export default function PedestrianCounterPage() {
       return
     }
 
+    if (isExporting) {
+      console.log("Export already in progress")
+      return
+    }
+
+    setIsExporting(true) // Set exporting state immediately
     console.log(`Processing ${log.length} log entries for export`)
     const grouped = groupDataByInterval(log)
     console.log(`Generated ${grouped.length} grouped entries`)
 
     setGroupedData(grouped)
     setShowExportModal(true)
-  }, [log, groupDataByInterval])
+  }, [log, groupDataByInterval, isExporting])
 
   const handleExportComplete = useCallback(async () => {
-    console.log("Export complete triggered")
+    console.log("Export complete triggered from modal")
 
     if (groupedData.length === 0) {
       console.error("No grouped data available for export")
+      setIsExporting(false) // Reset exporting state
       setShowExportModal(false)
       return
     }
@@ -570,25 +579,46 @@ export default function PedestrianCounterPage() {
         const firstVideoStartTime = videoMetadata[0]?.recordingStartTime
         if (firstVideoStartTime) {
           const recordingDate = firstVideoStartTime.toISOString().slice(0, 10)
-          filename = `pedestrian_counts_${intervalLabel}_${recordingDate}_${timestamp}.csv`
+          filename = `pedestrian_counts_${recordingDate}_${timestamp}.csv`
         } else {
-          filename = `pedestrian_counts_${intervalLabel}_multi_video_${timestamp}.csv`
+          filename = `pedestrian_counts_${timestamp}.csv`
         }
       } else {
-        filename = `pedestrian_counts_${intervalLabel}_video_time_${timestamp}.csv`
+        filename = `pedestrian_counts_${timestamp}.csv`
       }
 
       console.log(`Attempting to download CSV: ${filename}`)
       await downloadCSV(groupedData, filename)
       console.log("CSV download completed successfully")
+
+      // Clear all data after successful export
+      setVideoSrc(null)
+      setIntersections([])
+      setCounts(initialCounts)
+      setLog([])
+      setIsPlaying(false)
+      setPlaybackRate(1)
+      setLastPressed(null)
+      setCurrentTime(0)
+      setDuration(0)
+      setRecordingStartTime(null)
+      setVideoCount(1)
+      setCurrentVideoIndex(0)
+      setVideoMetadata({})
+      setGroupedData([]) // Clear grouped data as well
+      clearStorage()
+
+      console.log("All data cleared after successful export")
     } catch (error) {
       console.error("Failed to export CSV:", error)
       // Don't close modal if export failed, let user try again
+      setIsExporting(false) // Reset exporting state on error
       return
     }
 
-    setShowExportModal(false)
-  }, [groupedData, downloadCSV, videoMetadata])
+    setIsExporting(false) // Reset exporting state
+    setShowExportModal(false) // Close modal
+  }, [groupedData, downloadCSV, videoMetadata, clearStorage])
 
   const togglePlay = useCallback(() => {
     if (!videoRef.current) return
@@ -926,7 +956,7 @@ export default function PedestrianCounterPage() {
 
         <ExportProgressModal
             isOpen={showExportModal}
-            onComplete={handleExportComplete}
+            onComplete={handleExportComplete} // This will now trigger the actual download and clear
             totalEntries={log.length}
             groupedEntries={groupedData.length}
         />
