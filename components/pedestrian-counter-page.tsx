@@ -62,8 +62,7 @@ const AUTO_SAVE_INTERVAL = 5000
 
 // Configuration constants for easy modification
 const DATA_GROUPING_CONFIG = {
-  INTERVAL_SIZE_SECONDS: 60, // 1 minute intervals
-  INTERVAL_LABEL: "1-minute", // Used for logging and debugging
+  INTERVAL_SIZE_SECONDS: 900, // 1 minute intervals
 } as const
 
 export default function PedestrianCounterPage() {
@@ -289,6 +288,8 @@ export default function PedestrianCounterPage() {
   ])
 
   useEffect(() => {
+    if (!isDataLoaded) return
+
     const handleBeforeUnload = () => {
       saveToStorage()
     }
@@ -306,7 +307,7 @@ export default function PedestrianCounterPage() {
       window.removeEventListener("beforeunload", handleBeforeUnload)
       document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
-  }, [saveToStorage])
+  }, [saveToStorage, isDataLoaded])
 
   // Handle video end detection
   useEffect(() => {
@@ -334,7 +335,7 @@ export default function PedestrianCounterPage() {
       (logEntries: LogEntry[], intervalSize: number = DATA_GROUPING_CONFIG.INTERVAL_SIZE_SECONDS): GroupedEntry[] => {
         if (logEntries.length === 0) return []
 
-        console.log(`Grouping data by ${intervalSize}s intervals (${DATA_GROUPING_CONFIG.INTERVAL_LABEL})`)
+        console.log(`Grouping data by ${intervalSize}s intervals`)
 
         const groups: Record<string, GroupedEntry> = {}
 
@@ -475,61 +476,118 @@ export default function PedestrianCounterPage() {
   }, [clearStorage])
 
   const downloadCSV = useCallback((data: GroupedEntry[], filename: string) => {
-    try {
-      const csvRows = data.map((entry) => {
-        const keyCounts = [1, 2, 3, 4, 5, 6, 7, 8].map((keyNum) => {
-          const direction = directions.find((d) => d.key === keyNum.toString())
-          return direction ? entry.directions[direction.name] || 0 : 0
+    return new Promise<void>((resolve, reject) => {
+      try {
+        console.log(`Starting CSV export with ${data.length} entries`)
+
+        if (data.length === 0) {
+          console.warn("No data to export")
+          reject(new Error("No data to export"))
+          return
+        }
+
+        const csvRows = data.map((entry) => {
+          const keyCounts = [1, 2, 3, 4, 5, 6, 7, 8].map((keyNum) => {
+            const direction = directions.find((d) => d.key === keyNum.toString())
+            return direction ? entry.directions[direction.name] || 0 : 0
+          })
+          return [entry.interval, ...keyCounts].join(",")
         })
-        return [entry.interval, ...keyCounts].join(",")
-      })
 
-      const header = "Time interval,1,2,3,4,5,6,7,8"
-      const csvContent = [header, ...csvRows].join("\n")
+        const header = "Time interval,1,2,3,4,5,6,7,8"
+        const csvContent = [header, ...csvRows].join("\n")
 
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
-      const link = document.createElement("a")
-      const url = URL.createObjectURL(blob)
-      link.setAttribute("href", url)
-      link.setAttribute("download", filename)
-      link.style.visibility = "hidden"
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
-    } catch (error) {
-      console.error("Error downloading CSV:", error)
-    }
+        console.log(`CSV content generated: ${csvContent.length} characters`)
+
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+        const link = document.createElement("a")
+        const url = URL.createObjectURL(blob)
+
+        link.setAttribute("href", url)
+        link.setAttribute("download", filename)
+        link.style.visibility = "hidden"
+
+        document.body.appendChild(link)
+
+        // Add a small delay to ensure the link is properly added to DOM
+        setTimeout(() => {
+          try {
+            link.click()
+            console.log(`CSV download triggered: ${filename}`)
+
+            // Clean up after a delay
+            setTimeout(() => {
+              document.body.removeChild(link)
+              URL.revokeObjectURL(url)
+              resolve()
+            }, 100)
+          } catch (clickError) {
+            console.error("Error clicking download link:", clickError)
+            document.body.removeChild(link)
+            URL.revokeObjectURL(url)
+            reject(clickError)
+          }
+        }, 10)
+      } catch (error) {
+        console.error("Error creating CSV download:", error)
+        reject(error)
+      }
+    })
   }, [])
 
   const handleFinish = useCallback(() => {
-    if (log.length === 0) return
+    if (log.length === 0) {
+      console.warn("No log entries to export")
+      return
+    }
+
+    console.log(`Processing ${log.length} log entries for export`)
     const grouped = groupDataByInterval(log)
+    console.log(`Generated ${grouped.length} grouped entries`)
+
     setGroupedData(grouped)
     setShowExportModal(true)
   }, [log, groupDataByInterval])
 
-  const handleExportComplete = useCallback(() => {
-    setShowExportModal(false)
-    if (groupedData.length > 0) {
+  const handleExportComplete = useCallback(async () => {
+    console.log("Export complete triggered")
+
+    if (groupedData.length === 0) {
+      console.error("No grouped data available for export")
+      setShowExportModal(false)
+      return
+    }
+
+    try {
       const now = new Date()
       const timestamp = now.toISOString().slice(0, 19).replace(/:/g, "-")
+      const intervalMinutes = Math.floor(DATA_GROUPING_CONFIG.INTERVAL_SIZE_SECONDS / 60)
+      const intervalLabel =
+          intervalMinutes >= 1 ? `${intervalMinutes}min` : `${DATA_GROUPING_CONFIG.INTERVAL_SIZE_SECONDS}sec`
 
       let filename: string
       if (Object.keys(videoMetadata).length > 0) {
         const firstVideoStartTime = videoMetadata[0]?.recordingStartTime
         if (firstVideoStartTime) {
           const recordingDate = firstVideoStartTime.toISOString().slice(0, 10)
-          filename = `pedestrian_counts_${DATA_GROUPING_CONFIG.INTERVAL_LABEL}_${recordingDate}_${timestamp}.csv`
+          filename = `pedestrian_counts_${intervalLabel}_${recordingDate}_${timestamp}.csv`
         } else {
-          filename = `pedestrian_counts_${DATA_GROUPING_CONFIG.INTERVAL_LABEL}_multi_video_${timestamp}.csv`
+          filename = `pedestrian_counts_${intervalLabel}_multi_video_${timestamp}.csv`
         }
       } else {
-        filename = `pedestrian_counts_${DATA_GROUPING_CONFIG.INTERVAL_LABEL}_video_time_${timestamp}.csv`
+        filename = `pedestrian_counts_${intervalLabel}_video_time_${timestamp}.csv`
       }
 
-      downloadCSV(groupedData, filename)
+      console.log(`Attempting to download CSV: ${filename}`)
+      await downloadCSV(groupedData, filename)
+      console.log("CSV download completed successfully")
+    } catch (error) {
+      console.error("Failed to export CSV:", error)
+      // Don't close modal if export failed, let user try again
+      return
     }
+
+    setShowExportModal(false)
   }, [groupedData, downloadCSV, videoMetadata])
 
   const togglePlay = useCallback(() => {
