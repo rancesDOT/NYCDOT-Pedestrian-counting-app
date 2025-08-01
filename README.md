@@ -12,22 +12,22 @@ A React(Next.JS)/Tailwind + TypeScript web app for tracking pedestrian counts. B
 
 If you need to set up Next.js:
 Install Next.js and React dependencies:
-```bash
+\`\`\`bash
 npm install next react react-dom
-```
+\`\`\`
 ## Project Installation
 
 Clone the repository and install dependencies:
 
-```bash
+\`\`\`bash
 git clone https://github.com/rancescolon/NYCDOT-Pedestrian-counting-app.git
 cd NYCDOT-Pedestrian-counting-app
-```
+\`\`\`
 ### Run Local Development Server
-```bash
+\`\`\`bash
 npm install
 npm run dev
-```
+\`\`\`
 Open your browser and go to [http://localhost:3000](http://localhost:3000) to view the app.
 
 

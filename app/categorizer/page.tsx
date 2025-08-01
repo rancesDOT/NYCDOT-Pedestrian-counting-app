@@ -1,5 +1,5 @@
-import VehicleCategorizePage from "@/components/vehicleCategorizer";
+import VehicleCategorizePage from "@/components/vehicleCategorizer"
 
 export default function CategorizerPage() {
-    return <VehicleCategorizePage />;
+  return <VehicleCategorizePage />
 }
