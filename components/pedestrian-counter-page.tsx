@@ -62,7 +62,7 @@ const AUTO_SAVE_INTERVAL = 5000
 
 // Configuration constants for easy modification
 const DATA_GROUPING_CONFIG = {
-  INTERVAL_SIZE_SECONDS: 60,
+  INTERVAL_SIZE_SECONDS: 60, //900
 } as const
 
 export default function PedestrianCounterPage() {
@@ -126,13 +126,11 @@ export default function PedestrianCounterPage() {
       hour12: false,
       hour: "2-digit",
       minute: "2-digit",
-      second: "2-digit",
     })
     const endTimeStr = endTime.toLocaleTimeString("en-US", {
       hour12: false,
       hour: "2-digit",
       minute: "2-digit",
-      second: "2-digit",
     })
     return `${startTimeStr} - ${endTimeStr}`
   }, [])
