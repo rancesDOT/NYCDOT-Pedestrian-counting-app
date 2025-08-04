@@ -7,8 +7,8 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  assetPrefix: process.env.NODE_ENV === 'production' ? '/NYCDOT-Pedestrian-counting-app/' : '',
-  basePath: process.env.NODE_ENV === 'production' ? '/NYCDOT-Pedestrian-counting-app' : '',
+  assetPrefix: process.env.NODE_ENV === 'production' ? '/NYCDOT-counting-app/' : '',
+  basePath: process.env.NODE_ENV === 'production' ? '/NYCDOT-counting-app' : '',
   eslint: {
     ignoreDuringBuilds: true,
   },
