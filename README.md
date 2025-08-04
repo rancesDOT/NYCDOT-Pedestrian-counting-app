@@ -20,7 +20,7 @@ npm install next react react-dom
 Clone the repository and install dependencies:
 
 ```bash
-git clone https://github.com/rancescolon/NYCDOT-Pedestrian-counting-app.git
+git clone https://github.com/rancescolon/NYCDOT-counting-app.git
 cd NYCDOT-Pedestrian-counting-app
 ```
 ### Run Local Development Server
@@ -35,10 +35,10 @@ Open your browser and go to [http://localhost:3000](http://localhost:3000) to vi
 
 This project is live at using Github Pages:
 
-https://rancesdot.github.io/NYCDOT-Pedestrian-counting-app/
+[https://rancesdot.github.io/NYCDOT-Pedestrian-counting-app/](https://rancesdot.github.io/NYCDOT-counting-app/)
 
 # Contributing
-1. Fork the [repo](https://github.com/rancesDOT/NYCDOT-Pedestrian-counting-app)
+1. Fork the [repo](https://github.com/rancesDOT/NYCDOT-counting-app)
 2. Create a feature branch 
 3. Commit your changes
 4. Open a pull request
