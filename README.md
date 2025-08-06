@@ -49,3 +49,6 @@ https://rancescolon.github.io/NYCDOT-counting-app/
   - layout.tsx — Root layout 
   - page.tsx — Main page (to add new pages create new folder with new page.tsx [source](https://nextjs.org/docs/pages/building-your-application/routing/pages-and-layouts))
   - counter/page.tsx — Counter feature
+ 
+# how to use app 
+https://scribehow.com/viewer/How_to_use_Counting_tool__we9DplVoSeet0iaL145XJA
